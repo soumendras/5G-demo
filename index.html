@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Biometrics Dashboard</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a2e;
+      --line:rgba(255,255,255,.16);
+      --text:#e9eefc;
+      --muted:rgba(233,238,252,.72);
+      --accent:#ff6b9a; /* big numbers (like the sketch pink/red) */
+      --ok:#7CFFB2;
+      --bad:#FF7C7C;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .wrap{ max-width: 880px; margin: 18px auto; padding: 0 14px; }
+    .board{
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* Generic rows */
+    .row{ display:grid; border-top: 2px solid var(--line); }
+    .row:first-child{ border-top:none; }
+    .two{ grid-template-columns: 1fr 1fr; }
+    .one{ grid-template-columns: 1fr; }
+
+    /* Cells */
+    .cell{
+      padding: 12px 14px;
+      min-height: 78px;
+      position: relative;
+    }
+    .two .cell:first-child{ border-right: 2px solid var(--line); }
+    .label{
+      font-size: 14px;
+      letter-spacing: .2px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .big{
+      font-size: 54px;
+      font-weight: 750;
+      line-height: 1;
+      color: var(--accent);
+      letter-spacing: .5px;
+    }
+    .unit{
+      font-size: 14px;
+      color: var(--muted);
+      margin-left: 8px;
+      font-weight: 600;
+    }
+    .small{
+      font-size: 16px;
+      color: var(--text);
+      font-weight: 650;
+    }
+    .meta{
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .statusDot{
+      display:inline-block; width:10px; height:10px; border-radius:50%;
+      margin-right:8px; vertical-align:middle;
+      background: var(--bad);
+    }
+    .ok .statusDot{ background: var(--ok); }
+    .bad .statusDot{ background: var(--bad); }
+
+    /* Chart row */
+    .chartWrap{ padding: 10px 14px 14px 14px; }
+    .chartHeader{
+      display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+      margin-bottom: 8px;
+    }
+    canvas{ width:100%; height: 170px; display:block; border: 2px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.10); }
+
+    /* Messages */
+    .msgText{
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    /* Logos */
+    .logoBox{
+      display:flex; align-items:center; justify-content:center;
+      min-height: 90px;
+      gap: 10px;
+    }
+    .logoBox img{
+      max-height: 56px;
+      max-width: 90%;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    }
+    .logoPlaceholder{
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    /* Responsive */
+    @media (max-width: 560px){
+      .two{ grid-template-columns: 1fr; }
+      .two .cell:first-child{ border-right:none; border-bottom: 2px solid var(--line); }
+      .big{ font-size: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="board">
+
+      <!-- Top: Ambient + Message -->
+      <div class="row two">
+        <div class="cell">
+          <div class="label">Ambient T°C</div>
+          <div class="small"><span id="ambient">—</span><span class="unit">°C</span></div>
+          <div class="meta">Channel <span id="ch">—</span></div>
+        </div>
+        <div class="cell" id="connClass">
+          <div class="label">Message</div>
+          <div class="small"><span class="statusDot"></span><span id="msgTop">starting…</span></div>
+          <div class="meta">Last update: <span id="lastUpdate">—</span></div>
+        </div>
+      </div>
+
+      <!-- Core + Fingertip -->
+      <div class="row two">
+        <div class="cell">
+          <div class="label">CORE T°C</div>
+          <div><span class="big" id="core">—</span><span class="unit">°C</span></div>
+        </div>
+        <div class="cell">
+          <div class="label">Fingertip T°C</div>
+          <div><span class="big" id="finger">—</span><span class="unit">°C</span></div>
+        </div>
+      </div>
+
+      <!-- ΔT chart -->
+      <div class="row one">
+        <div class="chartWrap">
+          <div class="chartHeader">
+            <div class="label" style="margin:0;">ΔT°C (Core − Fingertip)</div>
+            <div class="small">ΔT: <span id="deltaNow">—</span><span class="unit">°C</span></div>
+          </div>
+          <canvas id="dtChart" width="900" height="340"></canvas>
+          <div class="meta">Polling every 15s (ThingSpeak free rate).</div>
+        </div>
+      </div>
+
+      <!-- HR + RESP -->
+      <div class="row two">
+        <div class="cell">
+          <div class="label">HR (bpm)</div>
+          <div><span class="big" id="hr">—</span></div>
+        </div>
+        <div class="cell">
+          <div class="label">RESP (/min)</div>
+          <div><span class="big" id="resp">—</span></div>
+        </div>
+      </div>
+
+      <!-- Messages: Friend/Foe -->
+      <div class="row one">
+        <div class="cell">
+          <div class="label">Messages: Friend/Foe</div>
+          <div class="msgText" id="friendfoe">—</div>
+          <div class="meta">Tip: send it via ThingSpeak “status=” in your update request.</div>
+        </div>
+      </div>
+
+      <!-- Logos -->
+      <div class="row two">
+        <div class="cell logoBox">
+          <img id="logo1" src="assets/ualberta.png" alt="UAlberta logo" />
+          <div id="ph1" class="logoPlaceholder" style="display:none;">UAlberta logo</div>
+        </div>
+        <div class="cell logoBox">
+          <img id="logo2" src="assets/ideas.png" alt="IDEaS logo" />
+          <div id="ph2" class="logoPlaceholder" style="display:none;">IDEaS logo</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  // =========================
+  // CONFIG
+  // =========================
+  const CHANNEL_ID = 3255083;
+
+  // If channel is PRIVATE, set READ_API_KEY (NOT WRITE KEY). If public, leave "".
+  const READ_API_KEY = "";
+
+  // Field mapping (edit if your fields are different)
+  const F_CORE    = "field1";
+  const F_FINGER  = "field2";
+  const F_AMBIENT = "field3";
+  const F_HR      = "field4";
+  const F_RESP    = "field5";
+
+  const RESULTS = 60;      // how many points to draw for ΔT
+  const POLL_MS = 15000;   // ThingSpeak free rate is 15s
+
+  // =========================
+  // Helpers
+  // =========================
+  const el = (id) => document.getElementById(id);
+
+  function num(x){
+    const v = Number.parseFloat(x);
+    return Number.isFinite(v) ? v : null;
+  }
+  function fmtTemp(v){ return (v===null) ? "—" : v.toFixed(1); }
+  function fmtDelta(v){ return (v===null) ? "—" : v.toFixed(2); }
+  function fmtInt(v){ return (v===null) ? "—" : Math.round(v).toString(); }
+
+  function apiUrl(){
+    let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+    if (READ_API_KEY) url += `&api_key=${encodeURIComponent(READ_API_KEY)}`;
+    return url;
+  }
+
+  function setTopStatus(ok, text){
+    const box = el("connClass");
+    box.classList.remove("ok","bad");
+    box.classList.add(ok ? "ok" : "bad");
+    el("msgTop").textContent = text;
+  }
+
+  // Simple canvas line chart
+  function drawLineChart(canvas, ys){
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    // Background grid
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    for(let i=1;i<=4;i++){
+      const y = (H*i)/5;
+      ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+    }
+
+    // Filter finite points
+    const data = ys.filter(v => Number.isFinite(v));
+    if (data.length < 2){
+      ctx.fillStyle = "rgba(233,238,252,0.75)";
+      ctx.font = "20px system-ui";
+      ctx.fillText("No ΔT data yet", 22, H/2);
+      return;
+    }
+
+    let ymin = Math.min(...data), ymax = Math.max(...data);
+    const pad = Math.max(0.5, (ymax - ymin) * 0.15);
+    ymin -= pad; ymax += pad;
+
+    function xPix(i, n){ return 10 + ( (W-20) * (i/(n-1)) ); }
+    function yPix(v){
+      const t = (v - ymin) / (ymax - ymin);
+      return (H-10) - t*(H-20);
+    }
+
+    // Baseline at 0 (dashed)
+    if (0 >= ymin && 0 <= ymax){
+      ctx.setLineDash([10,8]);
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.moveTo(10, yPix(0));
+      ctx.lineTo(W-10, yPix(0));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Line
+    ctx.strokeStyle = "rgba(255,107,154,0.95)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const n = ys.length;
+    let started = false;
+    for(let i=0;i<n;i++){
+      const v = ys[i];
+      if (!Number.isFinite(v)) continue;
+      const xp = xPix(i,n), yp = yPix(v);
+      if(!started){ ctx.moveTo(xp,yp); started = true; }
+      else ctx.lineTo(xp,yp);
+    }
+    ctx.stroke();
+
+    // Labels (min/max)
+    ctx.fillStyle = "rgba(233,238,252,0.75)";
+    ctx.font = "14px system-ui";
+    ctx.fillText(`max ${ymax.toFixed(2)}°C`, 14, 22);
+    ctx.fillText(`min ${ymin.toFixed(2)}°C`, 14, H-14);
+  }
+
+  // Logo fallback (if you don't add images)
+  function setupLogoFallback(imgId, phId){
+    const img = el(imgId), ph = el(phId);
+    img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
+  }
+
+  // =========================
+  // Main refresh
+  // =========================
+  async function refresh(){
+    try{
+      setTopStatus(false, "loading…");
+      const res = await fetch(apiUrl(), { cache: "no-store" });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const feeds = Array.isArray(data.feeds) ? data.feeds : [];
+      if(feeds.length === 0){
+        setTopStatus(false, "no data");
+        return;
+      }
+
+      const last = feeds[feeds.length - 1];
+
+      const core   = num(last[F_CORE]);
+      const finger = num(last[F_FINGER]);
+      const amb    = num(last[F_AMBIENT]);
+      const hr     = num(last[F_HR]);
+      const resp   = num(last[F_RESP]);
+
+      el("ch").textContent = CHANNEL_ID;
+      el("core").textContent   = fmtTemp(core);
+      el("finger").textContent = fmtTemp(finger);
+      el("ambient").textContent= fmtTemp(amb);
+      el("hr").textContent     = fmtInt(hr);
+      el("resp").textContent   = fmtInt(resp);
+
+      // ΔT series
+      const dtSeries = feeds.map(r => {
+        const c = num(r[F_CORE]);
+        const f = num(r[F_FINGER]);
+        return (c===null || f===null) ? NaN : (c - f);
+      });
+      const dtNow = (core===null || finger===null) ? null : (core - finger);
+      el("deltaNow").textContent = fmtDelta(dtNow);
+
+      // Top message (derived)
+      // You can tune thresholds later—this is just a demo-friendly heuristic.
+      let msg = "live";
+      if (dtNow === null) msg = "waiting for temps…";
+      else if (dtNow > 8) msg = "ΔT high (cold periphery likely)";
+      else if (dtNow > 4) msg = "ΔT moderate";
+      else msg = "ΔT normal";
+
+      // Friend/Foe (from ThingSpeak status if provided)
+      const ff = (last.status && String(last.status).trim()) ? String(last.status).trim() : "—";
+      el("friendfoe").textContent = ff;
+
+      // Last update timestamp
+      const t = last.created_at ? new Date(last.created_at) : new Date();
+      el("lastUpdate").textContent = t.toLocaleString();
+
+      drawLineChart(el("dtChart"), dtSeries);
+      setTopStatus(true, msg);
+    }catch(e){
+      console.error(e);
+      setTopStatus(false, `error: ${e.message}`);
+    }
+  }
+
+  setupLogoFallback("logo1","ph1");
+  setupLogoFallback("logo2","ph2");
+
+  refresh();
+  setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
