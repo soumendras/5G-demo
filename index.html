@@ -11,7 +11,7 @@
       --line:rgba(255,255,255,.16);
       --text:#e9eefc;
       --muted:rgba(233,238,252,.72);
-      --accent:#ff6b9a; /* big numbers (like the sketch pink/red) */
+      --accent:#ff6b9a;
       --ok:#7CFFB2;
       --bad:#FF7C7C;
     }
@@ -28,7 +28,7 @@
       overflow: hidden;
     }
 
-    /* Generic rows */
+    /* Rows */
     .row{ display:grid; border-top: 2px solid var(--line); }
     .row:first-child{ border-top:none; }
     .two{ grid-template-columns: 1fr 1fr; }
@@ -53,6 +53,8 @@
       line-height: 1;
       color: var(--accent);
       letter-spacing: .5px;
+      word-break: keep-all;
+      white-space: nowrap;
     }
     .unit{
       font-size: 14px;
@@ -78,24 +80,35 @@
     .ok .statusDot{ background: var(--ok); }
     .bad .statusDot{ background: var(--bad); }
 
-    /* Chart row */
+    /* Chart */
     .chartWrap{ padding: 10px 14px 14px 14px; }
     .chartHeader{
       display:flex; align-items:baseline; justify-content:space-between; gap:10px;
       margin-bottom: 8px;
+      flex-wrap: wrap;
     }
-    canvas{ width:100%; height: 170px; display:block; border: 2px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.10); }
+    canvas{
+      width:100%;
+      height: 170px;
+      display:block;
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      background: rgba(0,0,0,.10);
+    }
 
     /* Messages */
     .msgText{
       font-size: 18px;
       font-weight: 700;
       letter-spacing: .2px;
+      overflow-wrap: anywhere;
     }
 
     /* Logos */
     .logoBox{
-      display:flex; align-items:center; justify-content:center;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       min-height: 90px;
       gap: 10px;
     }
@@ -111,11 +124,34 @@
       letter-spacing: .2px;
     }
 
-    /* Responsive */
+    /* === Mobile: generic === */
     @media (max-width: 560px){
+      .wrap{ margin: 12px auto; padding: 0 10px; }
       .two{ grid-template-columns: 1fr; }
-      .two .cell:first-child{ border-right:none; border-bottom: 2px solid var(--line); }
-      .big{ font-size: 46px; }
+      .two .cell:first-child{
+        border-right:none;
+        border-bottom: 2px solid var(--line);
+      }
+      .cell{ min-height: 64px; padding: 10px 12px; }
+      .big{ font-size: 44px; }
+      canvas{ height: 150px; }
+      .label{ font-size: 13px; }
+      .msgText{ font-size: 16px; }
+    }
+
+    /* === Mobile portrait: force single-column even on wider phones/tablets in portrait === */
+    @media (orientation: portrait) and (max-width: 900px){
+      .two{ grid-template-columns: 1fr; }
+      .two .cell:first-child{
+        border-right:none;
+        border-bottom: 2px solid var(--line);
+      }
+    }
+
+    /* === Very small phones === */
+    @media (max-width: 380px){
+      .big{ font-size: 38px; }
+      canvas{ height: 135px; }
     }
   </style>
 </head>
@@ -182,14 +218,14 @@
         </div>
       </div>
 
-      <!-- Logos -->
+      <!-- Logos (FIXED PATHS: your files are in repo root) -->
       <div class="row two">
         <div class="cell logoBox">
-          <img id="logo1" src="assets/ualberta.png" alt="UAlberta logo" />
+          <img id="logo1" src="./ualberta.png" alt="UAlberta logo" />
           <div id="ph1" class="logoPlaceholder" style="display:none;">UAlberta logo</div>
         </div>
         <div class="cell logoBox">
-          <img id="logo2" src="assets/ideas.jpg" alt="IDEaS logo" />
+          <img id="logo2" src="./ideas.jpg" alt="IDEaS logo" />
           <div id="ph2" class="logoPlaceholder" style="display:none;">IDEaS logo</div>
         </div>
       </div>
@@ -198,27 +234,18 @@
   </div>
 
 <script>
-  // =========================
-  // CONFIG
-  // =========================
   const CHANNEL_ID = 3255083;
-
-  // If channel is PRIVATE, set READ_API_KEY (NOT WRITE KEY). If public, leave "".
   const READ_API_KEY = "";
 
-  // Field mapping (edit if your fields are different)
   const F_CORE    = "field1";
   const F_FINGER  = "field2";
   const F_AMBIENT = "field3";
   const F_HR      = "field4";
   const F_RESP    = "field5";
 
-  const RESULTS = 60;      // how many points to draw for ΔT
-  const POLL_MS = 15000;   // ThingSpeak free rate is 15s
+  const RESULTS = 60;
+  const POLL_MS = 15000;
 
-  // =========================
-  // Helpers
-  // =========================
   const el = (id) => document.getElementById(id);
 
   function num(x){
@@ -242,14 +269,11 @@
     el("msgTop").textContent = text;
   }
 
-  // Simple canvas line chart
   function drawLineChart(canvas, ys){
     const ctx = canvas.getContext("2d");
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0,0,W,H);
 
-    // Background grid
-    ctx.globalAlpha = 1;
     ctx.strokeStyle = "rgba(255,255,255,0.12)";
     ctx.lineWidth = 1;
     for(let i=1;i<=4;i++){
@@ -257,7 +281,6 @@
       ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
     }
 
-    // Filter finite points
     const data = ys.filter(v => Number.isFinite(v));
     if (data.length < 2){
       ctx.fillStyle = "rgba(233,238,252,0.75)";
@@ -270,24 +293,19 @@
     const pad = Math.max(0.5, (ymax - ymin) * 0.15);
     ymin -= pad; ymax += pad;
 
-    function xPix(i, n){ return 10 + ( (W-20) * (i/(n-1)) ); }
+    function xPix(i, n){ return 10 + ((W-20) * (i/(n-1))); }
     function yPix(v){
       const t = (v - ymin) / (ymax - ymin);
       return (H-10) - t*(H-20);
     }
 
-    // Baseline at 0 (dashed)
     if (0 >= ymin && 0 <= ymax){
       ctx.setLineDash([10,8]);
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.beginPath();
-      ctx.moveTo(10, yPix(0));
-      ctx.lineTo(W-10, yPix(0));
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
       ctx.setLineDash([]);
     }
 
-    // Line
     ctx.strokeStyle = "rgba(255,107,154,0.95)";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -301,23 +319,13 @@
       else ctx.lineTo(xp,yp);
     }
     ctx.stroke();
-
-    // Labels (min/max)
-    ctx.fillStyle = "rgba(233,238,252,0.75)";
-    ctx.font = "14px system-ui";
-    ctx.fillText(`max ${ymax.toFixed(2)}°C`, 14, 22);
-    ctx.fillText(`min ${ymin.toFixed(2)}°C`, 14, H-14);
   }
 
-  // Logo fallback (if you don't add images)
   function setupLogoFallback(imgId, phId){
     const img = el(imgId), ph = el(phId);
     img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
   }
 
-  // =========================
-  // Main refresh
-  // =========================
   async function refresh(){
     try{
       setTopStatus(false, "loading…");
@@ -340,13 +348,12 @@
       const resp   = num(last[F_RESP]);
 
       el("ch").textContent = CHANNEL_ID;
-      el("core").textContent   = fmtTemp(core);
-      el("finger").textContent = fmtTemp(finger);
-      el("ambient").textContent= fmtTemp(amb);
-      el("hr").textContent     = fmtInt(hr);
-      el("resp").textContent   = fmtInt(resp);
+      el("core").textContent    = fmtTemp(core);
+      el("finger").textContent  = fmtTemp(finger);
+      el("ambient").textContent = fmtTemp(amb);
+      el("hr").textContent      = fmtInt(hr);
+      el("resp").textContent    = fmtInt(resp);
 
-      // ΔT series
       const dtSeries = feeds.map(r => {
         const c = num(r[F_CORE]);
         const f = num(r[F_FINGER]);
@@ -355,19 +362,15 @@
       const dtNow = (core===null || finger===null) ? null : (core - finger);
       el("deltaNow").textContent = fmtDelta(dtNow);
 
-      // Top message (derived)
-      // You can tune thresholds later—this is just a demo-friendly heuristic.
       let msg = "live";
       if (dtNow === null) msg = "waiting for temps…";
       else if (dtNow > 8) msg = "ΔT high (cold periphery likely)";
       else if (dtNow > 4) msg = "ΔT moderate";
       else msg = "ΔT normal";
 
-      // Friend/Foe (from ThingSpeak status if provided)
       const ff = (last.status && String(last.status).trim()) ? String(last.status).trim() : "—";
       el("friendfoe").textContent = ff;
 
-      // Last update timestamp
       const t = last.created_at ? new Date(last.created_at) : new Date();
       el("lastUpdate").textContent = t.toLocaleString();
 
