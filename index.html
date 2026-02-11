@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Biometrics Dashboard</title>
+
   <style>
     :root{
       --bg:#0b1220;
@@ -11,15 +12,19 @@
       --line:rgba(255,255,255,.16);
       --text:#e9eefc;
       --muted:rgba(233,238,252,.72);
-      --accent:#ff6b9a;
+      --accent:#ff6b9a; /* big numbers */
       --ok:#7CFFB2;
       --bad:#FF7C7C;
     }
+
     *{ box-sizing:border-box; }
     body{
-      margin:0; background:var(--bg); color:var(--text);
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
+
     .wrap{ max-width: 880px; margin: 18px auto; padding: 0 14px; }
     .board{
       background: var(--panel);
@@ -28,7 +33,7 @@
       overflow: hidden;
     }
 
-    /* Rows */
+    /* Generic rows */
     .row{ display:grid; border-top: 2px solid var(--line); }
     .row:first-child{ border-top:none; }
     .two{ grid-template-columns: 1fr 1fr; }
@@ -41,6 +46,7 @@
       position: relative;
     }
     .two .cell:first-child{ border-right: 2px solid var(--line); }
+
     .label{
       font-size: 14px;
       letter-spacing: .2px;
@@ -53,7 +59,6 @@
       line-height: 1;
       color: var(--accent);
       letter-spacing: .5px;
-      word-break: keep-all;
       white-space: nowrap;
     }
     .unit{
@@ -72,18 +77,25 @@
       font-size: 12px;
       color: var(--muted);
     }
+
     .statusDot{
-      display:inline-block; width:10px; height:10px; border-radius:50%;
-      margin-right:8px; vertical-align:middle;
+      display:inline-block;
+      width:10px; height:10px;
+      border-radius:50%;
+      margin-right:8px;
+      vertical-align:middle;
       background: var(--bad);
     }
     .ok .statusDot{ background: var(--ok); }
     .bad .statusDot{ background: var(--bad); }
 
-    /* Chart */
+    /* Chart row */
     .chartWrap{ padding: 10px 14px 14px 14px; }
     .chartHeader{
-      display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:10px;
       margin-bottom: 8px;
       flex-wrap: wrap;
     }
@@ -111,6 +123,7 @@
       justify-content:center;
       min-height: 90px;
       gap: 10px;
+      padding: 10px 12px;
     }
     .logoBox img{
       max-height: 56px;
@@ -124,42 +137,58 @@
       letter-spacing: .2px;
     }
 
-    /* === Mobile: generic === */
-    @media (max-width: 560px){
-      .wrap{ margin: 12px auto; padding: 0 10px; }
-      .two{ grid-template-columns: 1fr; }
+    /* =========================
+       Mobile portrait COMPACT:
+       - keep first 2 rows side-by-side
+       - reduce heights so whole page fits in one glance
+       ========================= */
+    @media (orientation: portrait) and (max-width: 560px){
+      body { overflow: hidden; }               /* try to avoid scrolling */
+      .wrap { margin: 0; padding: 8px; height: 100vh; }
+      .board { height: calc(100vh - 16px); }
+
+      /* Keep 2 columns on mobile for .two rows */
+      .two { grid-template-columns: 1fr 1fr; }
       .two .cell:first-child{
-        border-right:none;
-        border-bottom: 2px solid var(--line);
+        border-right: 2px solid var(--line);
+        border-bottom: none;
       }
-      .cell{ min-height: 64px; padding: 10px 12px; }
-      .big{ font-size: 44px; }
-      canvas{ height: 150px; }
-      .label{ font-size: 13px; }
-      .msgText{ font-size: 16px; }
+
+      /* Compact spacing + typography */
+      .cell{ padding: 8px 10px; min-height: 56px; }
+      .label{ font-size: 12px; margin-bottom: 4px; }
+      .small{ font-size: 13px; }
+      .big{ font-size: 36px; }
+      .unit{ font-size: 12px; margin-left: 6px; }
+
+      /* Hide meta to save vertical space */
+      .meta{ display: none; }
+
+      /* Chart smaller */
+      .chartWrap{ padding: 6px 10px 8px 10px; }
+      canvas{ height: 95px; }
+
+      /* Friend/Foe smaller */
+      .msgText{ font-size: 14px; }
+
+      /* Logos smaller */
+      .logoBox{ min-height: 58px; padding: 6px 10px; }
+      .logoBox img{ max-height: 32px; }
     }
 
-    /* === Mobile portrait: force single-column even on wider phones/tablets in portrait === */
-    @media (orientation: portrait) and (max-width: 900px){
-      .two{ grid-template-columns: 1fr; }
-      .two .cell:first-child{
-        border-right:none;
-        border-bottom: 2px solid var(--line);
-      }
-    }
-
-    /* === Very small phones === */
-    @media (max-width: 380px){
-      .big{ font-size: 38px; }
-      canvas{ height: 135px; }
+    @media (orientation: portrait) and (max-width: 380px){
+      .big{ font-size: 32px; }
+      canvas{ height: 85px; }
+      .logoBox img{ max-height: 28px; }
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <div class="board">
 
-      <!-- Top: Ambient + Message -->
+      <!-- Top: Ambient + Message (SIDE-BY-SIDE on mobile) -->
       <div class="row two">
         <div class="cell">
           <div class="label">Ambient T°C</div>
@@ -173,7 +202,7 @@
         </div>
       </div>
 
-      <!-- Core + Fingertip -->
+      <!-- Core + Fingertip (SIDE-BY-SIDE on mobile) -->
       <div class="row two">
         <div class="cell">
           <div class="label">CORE T°C</div>
@@ -197,7 +226,7 @@
         </div>
       </div>
 
-      <!-- HR + RESP -->
+      <!-- HR + RESP (SIDE-BY-SIDE on mobile) -->
       <div class="row two">
         <div class="cell">
           <div class="label">HR (bpm)</div>
@@ -218,13 +247,15 @@
         </div>
       </div>
 
-      <!-- Logos (FIXED PATHS: your files are in repo root) -->
+      <!-- Logos -->
       <div class="row two">
         <div class="cell logoBox">
+          <!-- repo root -->
           <img id="logo1" src="./ualberta.png" alt="UAlberta logo" />
           <div id="ph1" class="logoPlaceholder" style="display:none;">UAlberta logo</div>
         </div>
         <div class="cell logoBox">
+          <!-- repo root -->
           <img id="logo2" src="./ideas.jpg" alt="IDEaS logo" />
           <div id="ph2" class="logoPlaceholder" style="display:none;">IDEaS logo</div>
         </div>
@@ -233,160 +264,180 @@
     </div>
   </div>
 
-<script>
-  const CHANNEL_ID = 3255083;
-  const READ_API_KEY = "";
+  <script>
+    // =========================
+    // CONFIG
+    // =========================
+    const CHANNEL_ID = 3255083;
 
-  const F_CORE    = "field1";
-  const F_FINGER  = "field2";
-  const F_AMBIENT = "field3";
-  const F_HR      = "field4";
-  const F_RESP    = "field5";
+    // If channel is PRIVATE, set READ_API_KEY (NOT WRITE KEY). If public, leave "".
+    const READ_API_KEY = "";
 
-  const RESULTS = 60;
-  const POLL_MS = 15000;
+    // Field mapping
+    const F_CORE    = "field1";
+    const F_FINGER  = "field2";
+    const F_AMBIENT = "field3";
+    const F_HR      = "field4";
+    const F_RESP    = "field5";
 
-  const el = (id) => document.getElementById(id);
+    const RESULTS = 60;      // points in ΔT chart
+    const POLL_MS = 15000;   // 15s
 
-  function num(x){
-    const v = Number.parseFloat(x);
-    return Number.isFinite(v) ? v : null;
-  }
-  function fmtTemp(v){ return (v===null) ? "—" : v.toFixed(1); }
-  function fmtDelta(v){ return (v===null) ? "—" : v.toFixed(2); }
-  function fmtInt(v){ return (v===null) ? "—" : Math.round(v).toString(); }
+    // =========================
+    // Helpers
+    // =========================
+    const el = (id) => document.getElementById(id);
 
-  function apiUrl(){
-    let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
-    if (READ_API_KEY) url += `&api_key=${encodeURIComponent(READ_API_KEY)}`;
-    return url;
-  }
+    function num(x){
+      const v = Number.parseFloat(x);
+      return Number.isFinite(v) ? v : null;
+    }
+    function fmtTemp(v){ return (v===null) ? "—" : v.toFixed(1); }
+    function fmtDelta(v){ return (v===null) ? "—" : v.toFixed(2); }
+    function fmtInt(v){ return (v===null) ? "—" : Math.round(v).toString(); }
 
-  function setTopStatus(ok, text){
-    const box = el("connClass");
-    box.classList.remove("ok","bad");
-    box.classList.add(ok ? "ok" : "bad");
-    el("msgTop").textContent = text;
-  }
-
-  function drawLineChart(canvas, ys){
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0,0,W,H);
-
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
-    ctx.lineWidth = 1;
-    for(let i=1;i<=4;i++){
-      const y = (H*i)/5;
-      ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+    function apiUrl(){
+      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+      if (READ_API_KEY) url += `&api_key=${encodeURIComponent(READ_API_KEY)}`;
+      return url;
     }
 
-    const data = ys.filter(v => Number.isFinite(v));
-    if (data.length < 2){
-      ctx.fillStyle = "rgba(233,238,252,0.75)";
-      ctx.font = "20px system-ui";
-      ctx.fillText("No ΔT data yet", 22, H/2);
-      return;
+    function setTopStatus(ok, text){
+      const box = el("connClass");
+      box.classList.remove("ok","bad");
+      box.classList.add(ok ? "ok" : "bad");
+      el("msgTop").textContent = text;
     }
 
-    let ymin = Math.min(...data), ymax = Math.max(...data);
-    const pad = Math.max(0.5, (ymax - ymin) * 0.15);
-    ymin -= pad; ymax += pad;
+    // Canvas line chart
+    function drawLineChart(canvas, ys){
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
 
-    function xPix(i, n){ return 10 + ((W-20) * (i/(n-1))); }
-    function yPix(v){
-      const t = (v - ymin) / (ymax - ymin);
-      return (H-10) - t*(H-20);
-    }
+      // grid
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      for(let i=1;i<=4;i++){
+        const y = (H*i)/5;
+        ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+      }
 
-    if (0 >= ymin && 0 <= ymax){
-      ctx.setLineDash([10,8]);
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    ctx.strokeStyle = "rgba(255,107,154,0.95)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    const n = ys.length;
-    let started = false;
-    for(let i=0;i<n;i++){
-      const v = ys[i];
-      if (!Number.isFinite(v)) continue;
-      const xp = xPix(i,n), yp = yPix(v);
-      if(!started){ ctx.moveTo(xp,yp); started = true; }
-      else ctx.lineTo(xp,yp);
-    }
-    ctx.stroke();
-  }
-
-  function setupLogoFallback(imgId, phId){
-    const img = el(imgId), ph = el(phId);
-    img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
-  }
-
-  async function refresh(){
-    try{
-      setTopStatus(false, "loading…");
-      const res = await fetch(apiUrl(), { cache: "no-store" });
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      const feeds = Array.isArray(data.feeds) ? data.feeds : [];
-      if(feeds.length === 0){
-        setTopStatus(false, "no data");
+      const data = ys.filter(v => Number.isFinite(v));
+      if (data.length < 2){
+        ctx.fillStyle = "rgba(233,238,252,0.75)";
+        ctx.font = "20px system-ui";
+        ctx.fillText("No ΔT data yet", 22, H/2);
         return;
       }
 
-      const last = feeds[feeds.length - 1];
+      let ymin = Math.min(...data), ymax = Math.max(...data);
+      const pad = Math.max(0.5, (ymax - ymin) * 0.15);
+      ymin -= pad; ymax += pad;
 
-      const core   = num(last[F_CORE]);
-      const finger = num(last[F_FINGER]);
-      const amb    = num(last[F_AMBIENT]);
-      const hr     = num(last[F_HR]);
-      const resp   = num(last[F_RESP]);
+      function xPix(i, n){ return 10 + ((W-20) * (i/(n-1))); }
+      function yPix(v){
+        const t = (v - ymin) / (ymax - ymin);
+        return (H-10) - t*(H-20);
+      }
 
-      el("ch").textContent = CHANNEL_ID;
-      el("core").textContent    = fmtTemp(core);
-      el("finger").textContent  = fmtTemp(finger);
-      el("ambient").textContent = fmtTemp(amb);
-      el("hr").textContent      = fmtInt(hr);
-      el("resp").textContent    = fmtInt(resp);
+      // 0 baseline
+      if (0 >= ymin && 0 <= ymax){
+        ctx.setLineDash([10,8]);
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.beginPath();
+        ctx.moveTo(10, yPix(0));
+        ctx.lineTo(W-10, yPix(0));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
-      const dtSeries = feeds.map(r => {
-        const c = num(r[F_CORE]);
-        const f = num(r[F_FINGER]);
-        return (c===null || f===null) ? NaN : (c - f);
-      });
-      const dtNow = (core===null || finger===null) ? null : (core - finger);
-      el("deltaNow").textContent = fmtDelta(dtNow);
-
-      let msg = "live";
-      if (dtNow === null) msg = "waiting for temps…";
-      else if (dtNow > 8) msg = "ΔT high (cold periphery likely)";
-      else if (dtNow > 4) msg = "ΔT moderate";
-      else msg = "ΔT normal";
-
-      const ff = (last.status && String(last.status).trim()) ? String(last.status).trim() : "—";
-      el("friendfoe").textContent = ff;
-
-      const t = last.created_at ? new Date(last.created_at) : new Date();
-      el("lastUpdate").textContent = t.toLocaleString();
-
-      drawLineChart(el("dtChart"), dtSeries);
-      setTopStatus(true, msg);
-    }catch(e){
-      console.error(e);
-      setTopStatus(false, `error: ${e.message}`);
+      // line
+      ctx.strokeStyle = "rgba(255,107,154,0.95)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const n = ys.length;
+      let started = false;
+      for(let i=0;i<n;i++){
+        const v = ys[i];
+        if (!Number.isFinite(v)) continue;
+        const xp = xPix(i,n), yp = yPix(v);
+        if(!started){ ctx.moveTo(xp,yp); started = true; }
+        else ctx.lineTo(xp,yp);
+      }
+      ctx.stroke();
     }
-  }
 
-  setupLogoFallback("logo1","ph1");
-  setupLogoFallback("logo2","ph2");
+    function setupLogoFallback(imgId, phId){
+      const img = el(imgId), ph = el(phId);
+      img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
+    }
 
-  refresh();
-  setInterval(refresh, POLL_MS);
-</script>
+    // =========================
+    // Main refresh
+    // =========================
+    async function refresh(){
+      try{
+        setTopStatus(false, "loading…");
+        const res = await fetch(apiUrl(), { cache: "no-store" });
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const feeds = Array.isArray(data.feeds) ? data.feeds : [];
+        if(feeds.length === 0){
+          setTopStatus(false, "no data");
+          return;
+        }
+
+        const last = feeds[feeds.length - 1];
+
+        const core   = num(last[F_CORE]);
+        const finger = num(last[F_FINGER]);
+        const amb    = num(last[F_AMBIENT]);
+        const hr     = num(last[F_HR]);
+        const resp   = num(last[F_RESP]);
+
+        el("ch").textContent = CHANNEL_ID;
+        el("core").textContent    = fmtTemp(core);
+        el("finger").textContent  = fmtTemp(finger);
+        el("ambient").textContent = fmtTemp(amb);
+        el("hr").textContent      = fmtInt(hr);
+        el("resp").textContent    = fmtInt(resp);
+
+        const dtSeries = feeds.map(r => {
+          const c = num(r[F_CORE]);
+          const f = num(r[F_FINGER]);
+          return (c===null || f===null) ? NaN : (c - f);
+        });
+
+        const dtNow = (core===null || finger===null) ? null : (core - finger);
+        el("deltaNow").textContent = fmtDelta(dtNow);
+
+        let msg = "live";
+        if (dtNow === null) msg = "waiting for temps…";
+        else if (dtNow > 8) msg = "ΔT high";
+        else if (dtNow > 4) msg = "ΔT moderate";
+        else msg = "ΔT normal";
+
+        const ff = (last.status && String(last.status).trim()) ? String(last.status).trim() : "—";
+        el("friendfoe").textContent = ff;
+
+        const t = last.created_at ? new Date(last.created_at) : new Date();
+        el("lastUpdate").textContent = t.toLocaleString();
+
+        drawLineChart(el("dtChart"), dtSeries);
+        setTopStatus(true, msg);
+      }catch(e){
+        console.error(e);
+        setTopStatus(false, `error: ${e.message}`);
+      }
+    }
+
+    setupLogoFallback("logo1","ph1");
+    setupLogoFallback("logo2","ph2");
+
+    refresh();
+    setInterval(refresh, POLL_MS);
+  </script>
 </body>
 </html>
