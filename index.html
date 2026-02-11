@@ -33,7 +33,7 @@
       overflow: hidden;
     }
 
-    /* Generic rows */
+    /* Rows */
     .row{ display:grid; border-top: 2px solid var(--line); }
     .row:first-child{ border-top:none; }
     .two{ grid-template-columns: 1fr 1fr; }
@@ -78,6 +78,13 @@
       color: var(--muted);
     }
 
+    .headerTitle{
+      font-size: 18px;
+      font-weight: 850;
+      letter-spacing: .3px;
+      margin-bottom: 6px;
+    }
+
     .statusDot{
       display:inline-block;
       width:10px; height:10px;
@@ -89,7 +96,7 @@
     .ok .statusDot{ background: var(--ok); }
     .bad .statusDot{ background: var(--bad); }
 
-    /* Chart row */
+    /* Chart */
     .chartWrap{ padding: 10px 14px 14px 14px; }
     .chartHeader{
       display:flex;
@@ -138,48 +145,45 @@
     }
 
     /* =========================
-       Mobile portrait COMPACT:
-       - keep first 2 rows side-by-side
-       - reduce heights so whole page fits in one glance
+       Mobile portrait COMPACT (but ~10–15% larger than before)
        ========================= */
     @media (orientation: portrait) and (max-width: 560px){
-      body { overflow: hidden; }               /* try to avoid scrolling */
-      .wrap { margin: 0; padding: 8px; height: 100vh; }
-      .board { height: calc(100vh - 16px); }
+      body { overflow: hidden; }
+      .wrap { margin: 0; padding: 9px; height: 100vh; }
+      .board { height: calc(100vh - 18px); }
 
-      /* Keep 2 columns on mobile for .two rows */
+      /* Keep 2 columns for .two rows */
       .two { grid-template-columns: 1fr 1fr; }
-      .two .cell:first-child{
-        border-right: 2px solid var(--line);
-        border-bottom: none;
-      }
+      .two .cell:first-child{ border-right: 2px solid var(--line); border-bottom: none; }
 
-      /* Compact spacing + typography */
-      .cell{ padding: 8px 10px; min-height: 56px; }
-      .label{ font-size: 12px; margin-bottom: 4px; }
-      .small{ font-size: 13px; }
-      .big{ font-size: 36px; }
-      .unit{ font-size: 12px; margin-left: 6px; }
+      /* Slightly larger than previous compact */
+      .cell{ padding: 9px 11px; min-height: 58px; }
+      .label{ font-size: 12.5px; margin-bottom: 4px; }
+      .headerTitle{ font-size: 16px; margin-bottom: 4px; }
+      .small{ font-size: 13.5px; }
+      .big{ font-size: 40px; }
+      .unit{ font-size: 12.5px; margin-left: 6px; }
 
-      /* Hide meta to save vertical space */
+      /* Hide meta to save vertical space (keeps one-glance view) */
       .meta{ display: none; }
 
       /* Chart smaller */
-      .chartWrap{ padding: 6px 10px 8px 10px; }
-      canvas{ height: 95px; }
+      .chartWrap{ padding: 7px 11px 9px 11px; }
+      canvas{ height: 105px; }
 
       /* Friend/Foe smaller */
-      .msgText{ font-size: 14px; }
+      .msgText{ font-size: 14.5px; }
 
-      /* Logos smaller */
-      .logoBox{ min-height: 58px; padding: 6px 10px; }
-      .logoBox img{ max-height: 32px; }
+      /* Logos */
+      .logoBox{ min-height: 62px; padding: 7px 11px; }
+      .logoBox img{ max-height: 36px; }
     }
 
     @media (orientation: portrait) and (max-width: 380px){
-      .big{ font-size: 32px; }
-      canvas{ height: 85px; }
-      .logoBox img{ max-height: 28px; }
+      .big{ font-size: 36px; }
+      canvas{ height: 95px; }
+      .logoBox img{ max-height: 32px; }
+      .headerTitle{ font-size: 15px; }
     }
   </style>
 </head>
@@ -188,21 +192,24 @@
   <div class="wrap">
     <div class="board">
 
-      <!-- Top: Ambient + Message (SIDE-BY-SIDE on mobile) -->
+      <!-- Top: Ambient + Dashboard Title -->
       <div class="row two">
         <div class="cell">
           <div class="label">Ambient T°C</div>
-          <div class="small"><span id="ambient">—</span><span class="unit">°C</span></div>
+          <!-- Make Ambient value match other sections (BIG) -->
+          <div><span class="big" id="ambient">—</span><span class="unit">°C</span></div>
           <div class="meta">Channel <span id="ch">—</span></div>
         </div>
+
+        <!-- Replace "Message" with a heading -->
         <div class="cell" id="connClass">
-          <div class="label">Message</div>
+          <div class="headerTitle">Biometrics Dashboard</div>
           <div class="small"><span class="statusDot"></span><span id="msgTop">starting…</span></div>
           <div class="meta">Last update: <span id="lastUpdate">—</span></div>
         </div>
       </div>
 
-      <!-- Core + Fingertip (SIDE-BY-SIDE on mobile) -->
+      <!-- Core + Fingertip -->
       <div class="row two">
         <div class="cell">
           <div class="label">CORE T°C</div>
@@ -226,7 +233,7 @@
         </div>
       </div>
 
-      <!-- HR + RESP (SIDE-BY-SIDE on mobile) -->
+      <!-- HR + RESP -->
       <div class="row two">
         <div class="cell">
           <div class="label">HR (bpm)</div>
@@ -238,7 +245,7 @@
         </div>
       </div>
 
-      <!-- Messages: Friend/Foe -->
+      <!-- Friend/Foe -->
       <div class="row one">
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
@@ -250,12 +257,10 @@
       <!-- Logos -->
       <div class="row two">
         <div class="cell logoBox">
-          <!-- repo root -->
           <img id="logo1" src="./ualberta.png" alt="UAlberta logo" />
           <div id="ph1" class="logoPlaceholder" style="display:none;">UAlberta logo</div>
         </div>
         <div class="cell logoBox">
-          <!-- repo root -->
           <img id="logo2" src="./ideas.jpg" alt="IDEaS logo" />
           <div id="ph2" class="logoPlaceholder" style="display:none;">IDEaS logo</div>
         </div>
@@ -269,23 +274,17 @@
     // CONFIG
     // =========================
     const CHANNEL_ID = 3255083;
+    const READ_API_KEY = ""; // if private, set READ key
 
-    // If channel is PRIVATE, set READ_API_KEY (NOT WRITE KEY). If public, leave "".
-    const READ_API_KEY = "";
-
-    // Field mapping
     const F_CORE    = "field1";
     const F_FINGER  = "field2";
     const F_AMBIENT = "field3";
     const F_HR      = "field4";
     const F_RESP    = "field5";
 
-    const RESULTS = 60;      // points in ΔT chart
-    const POLL_MS = 15000;   // 15s
+    const RESULTS = 60;
+    const POLL_MS = 15000;
 
-    // =========================
-    // Helpers
-    // =========================
     const el = (id) => document.getElementById(id);
 
     function num(x){
@@ -309,13 +308,11 @@
       el("msgTop").textContent = text;
     }
 
-    // Canvas line chart
     function drawLineChart(canvas, ys){
       const ctx = canvas.getContext("2d");
       const W = canvas.width, H = canvas.height;
       ctx.clearRect(0,0,W,H);
 
-      // grid
       ctx.strokeStyle = "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       for(let i=1;i<=4;i++){
@@ -341,18 +338,13 @@
         return (H-10) - t*(H-20);
       }
 
-      // 0 baseline
       if (0 >= ymin && 0 <= ymax){
         ctx.setLineDash([10,8]);
         ctx.strokeStyle = "rgba(255,255,255,0.35)";
-        ctx.beginPath();
-        ctx.moveTo(10, yPix(0));
-        ctx.lineTo(W-10, yPix(0));
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      // line
       ctx.strokeStyle = "rgba(255,107,154,0.95)";
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -373,9 +365,6 @@
       img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
     }
 
-    // =========================
-    // Main refresh
-    // =========================
     async function refresh(){
       try{
         setTopStatus(false, "loading…");
@@ -398,9 +387,9 @@
         const resp   = num(last[F_RESP]);
 
         el("ch").textContent = CHANNEL_ID;
+        el("ambient").textContent = fmtTemp(amb);
         el("core").textContent    = fmtTemp(core);
         el("finger").textContent  = fmtTemp(finger);
-        el("ambient").textContent = fmtTemp(amb);
         el("hr").textContent      = fmtInt(hr);
         el("resp").textContent    = fmtInt(resp);
 
