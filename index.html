@@ -33,13 +33,11 @@
       overflow: hidden;
     }
 
-    /* Rows */
     .row{ display:grid; border-top: 2px solid var(--line); }
     .row:first-child{ border-top:none; }
     .two{ grid-template-columns: 1fr 1fr; }
     .one{ grid-template-columns: 1fr; }
 
-    /* Cells */
     .cell{
       padding: 12px 14px;
       min-height: 78px;
@@ -84,7 +82,6 @@
       color: var(--muted);
     }
 
-    /* Chart */
     .chartWrap{ padding: 10px 14px 14px 14px; }
     .chartHeader{
       display:flex;
@@ -103,7 +100,6 @@
       background: rgba(0,0,0,.10);
     }
 
-    /* Friend/Foe */
     .msgText{
       font-size: 18px;
       font-weight: 700;
@@ -111,7 +107,6 @@
       overflow-wrap: anywhere;
     }
 
-    /* Logos */
     .logoBox{
       display:flex;
       align-items:center;
@@ -132,7 +127,6 @@
       letter-spacing: .2px;
     }
 
-    /* Optional subtle status cue (no dot) */
     #connClass.ok  { box-shadow: inset 0 0 0 2px rgba(124,255,178,.22); }
     #connClass.bad { box-shadow: inset 0 0 0 2px rgba(255,124,124,.22); }
 
@@ -140,8 +134,10 @@
       body { overflow: hidden; }
       .wrap { margin: 0; padding: 9px; height: 100vh; }
       .board { height: calc(100vh - 18px); }
+
       .two { grid-template-columns: 1fr 1fr; }
       .two .cell:first-child{ border-right: 2px solid var(--line); border-bottom: none; }
+
       .cell{ padding: 9px 11px; min-height: 58px; }
       .label{ font-size: 12.5px; margin-bottom: 4px; }
       .headerTitle{ font-size: 16px; margin-bottom: 4px; }
@@ -220,7 +216,7 @@
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
           <div class="msgText" id="friendfoe">—</div>
-          <div class="meta">Tip: send it via ThingSpeak “status=” in your update request.</div>
+          <div class="meta">Tip: send it via ThingSpeak field7 numeric (1=FRIEND, 2=FOE)</div>
         </div>
       </div>
 
@@ -240,7 +236,7 @@
 
   <script>
     const CHANNEL_ID = 3256737;  
-    const READ_API_KEY = ""; 
+    const READ_API_KEY = ""; // optional
 
     const Ambient_Temp     = "field1";
     const Core_Body_Temp   = "field2";
@@ -248,14 +244,17 @@
     const Delta            = "field4";
     const Heart_Rate       = "field5";
     const Respiration_Rate = "field6";
-    const FriendFoe_Field  = "field7";  // <-- ONLY CHANGE
+    const FriendFoe        = "field7"; // NEW: numeric field for FRIEND/FOE
 
     const RESULTS = 60;
     const POLL_MS = 1000;
 
     const el = (id) => document.getElementById(id);
 
-    function num(x){ const v = Number.parseFloat(x); return Number.isFinite(v) ? v : null; }
+    function num(x){
+      const v = Number.parseFloat(x);
+      return Number.isFinite(v) ? v : null;
+    }
     function fmtTemp(v){ return (v===null) ? "—" : v.toFixed(1); }
     function fmtDelta(v){ return (v===null) ? "—" : v.toFixed(2); }
     function fmtInt(v){ return (v===null) ? "—" : Math.round(v).toString(); }
@@ -271,6 +270,57 @@
       box.classList.remove("ok","bad");
       box.classList.add(ok ? "ok" : "bad");
       el("connState").textContent = text;
+    }
+
+    function drawLineChart(canvas, ys){
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      for(let i=1;i<=4;i++){
+        const y = (H*i)/5;
+        ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+      }
+      const data = ys.filter(v => Number.isFinite(v));
+      if (data.length < 2){
+        ctx.fillStyle = "rgba(233,238,252,0.75)";
+        ctx.font = "20px system-ui";
+        ctx.fillText("No ΔT data yet", 22, H/2);
+        return;
+      }
+      let ymin = Math.min(...data), ymax = Math.max(...data);
+      const pad = Math.max(0.5, (ymax - ymin) * 0.15);
+      ymin -= pad; ymax += pad;
+
+      function xPix(i, n){ return 10 + ((W-20) * (i/(n-1))); }
+      function yPix(v){ const t = (v - ymin) / (ymax - ymin); return (H-10) - t*(H-20); }
+
+      if (0 >= ymin && 0 <= ymax){
+        ctx.setLineDash([10,8]);
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.strokeStyle = "rgba(255,107,154,0.95)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const n = ys.length;
+      let started = false;
+      for(let i=0;i<n;i++){
+        const v = ys[i];
+        if (!Number.isFinite(v)) continue;
+        const xp = xPix(i,n), yp = yPix(v);
+        if(!started){ ctx.moveTo(xp,yp); started = true; }
+        else ctx.lineTo(xp,yp);
+      }
+      ctx.stroke();
+    }
+
+    function setupLogoFallback(imgId, phId){
+      const img = el(imgId), ph = el(phId);
+      img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
     }
 
     async function refresh(){
@@ -293,10 +343,6 @@
         const amb    = num(last[Ambient_Temp]);
         const hr     = num(last[Heart_Rate]);
         const resp   = num(last[Respiration_Rate]);
-        const ffRaw  = num(last[FriendFoe_Field]);  // <-- numeric code
-        let ffText = "—";
-        if(ffRaw === 1) ffText = "FRIEND";
-        else if(ffRaw === 2) ffText = "FOE";
 
         el("ch").textContent = CHANNEL_ID;
         el("ambient").textContent = fmtTemp(amb);
@@ -304,7 +350,6 @@
         el("finger").textContent  = fmtTemp(finger);
         el("hr").textContent      = fmtInt(hr);
         el("resp").textContent    = fmtInt(resp);
-        el("friendfoe").textContent = ffText;  // <-- display FRIEND/FOE
 
         const dtSeries = feeds.map(r => {
           const c = num(r[Core_Body_Temp]);
@@ -315,6 +360,18 @@
         const dtNow = (core===null || finger===null) ? null : (core - finger);
         el("deltaNow").textContent = fmtDelta(dtNow);
 
+        // --- FRIEND/FOE from field7 numeric ---
+        const ffVal = num(last[FriendFoe]);
+        let ffText = "—";
+        if(ffVal === 1) ffText = "FRIEND";
+        else if(ffVal === 2) ffText = "FOE";
+
+        const ffEl = el("friendfoe");
+        ffEl.textContent = ffText;
+        ffEl.style.color = "var(--text)";
+        if(ffText === "FRIEND") ffEl.style.color = "var(--ok)";
+        else if(ffText === "FOE") ffEl.style.color = "var(--bad)";
+
         const t = last.created_at ? new Date(last.created_at) : new Date();
         el("lastUpdate").textContent = t.toLocaleString();
 
@@ -324,60 +381,6 @@
         console.error(e);
         setTopStatus(false, `error: ${e.message}`);
       }
-    }
-
-    function drawLineChart(canvas, ys){
-      const ctx = canvas.getContext("2d");
-      const W = canvas.width, H = canvas.height;
-      ctx.clearRect(0,0,W,H);
-
-      ctx.strokeStyle = "rgba(255,255,255,0.12)";
-      ctx.lineWidth = 1;
-      for(let i=1;i<=4;i++){
-        const y = (H*i)/5;
-        ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10, y); ctx.stroke();
-      }
-
-      const data = ys.filter(v => Number.isFinite(v));
-      if(data.length < 2){
-        ctx.fillStyle = "rgba(233,238,252,0.75)";
-        ctx.font = "20px system-ui";
-        ctx.fillText("No ΔT data yet", 22, H/2);
-        return;
-      }
-
-      let ymin = Math.min(...data), ymax = Math.max(...data);
-      const pad = Math.max(0.5, (ymax - ymin) * 0.15);
-      ymin -= pad; ymax += pad;
-
-      function xPix(i,n){ return 10 + ((W-20)*(i/(n-1))); }
-      function yPix(v){ const t=(v-ymin)/(ymax-ymin); return (H-10) - t*(H-20); }
-
-      if(0 >= ymin && 0 <= ymax){
-        ctx.setLineDash([10,8]);
-        ctx.strokeStyle = "rgba(255,255,255,0.35)";
-        ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      ctx.strokeStyle = "rgba(255,107,154,0.95)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      const n = ys.length;
-      let started = false;
-      for(let i=0;i<n;i++){
-        const v = ys[i];
-        if(!Number.isFinite(v)) continue;
-        const xp = xPix(i,n), yp = yPix(v);
-        if(!started){ ctx.moveTo(xp,yp); started=true; }
-        else ctx.lineTo(xp,yp);
-      }
-      ctx.stroke();
-    }
-
-    function setupLogoFallback(imgId, phId){
-      const img = el(imgId), ph = el(phId);
-      img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
     }
 
     setupLogoFallback("logo1","ph1");
