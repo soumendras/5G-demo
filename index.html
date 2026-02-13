@@ -33,11 +33,13 @@
       overflow: hidden;
     }
 
+    /* Rows */
     .row{ display:grid; border-top: 2px solid var(--line); }
     .row:first-child{ border-top:none; }
     .two{ grid-template-columns: 1fr 1fr; }
     .one{ grid-template-columns: 1fr; }
 
+    /* Cells */
     .cell{
       padding: 12px 14px;
       min-height: 78px;
@@ -82,6 +84,7 @@
       color: var(--muted);
     }
 
+    /* Chart */
     .chartWrap{ padding: 10px 14px 14px 14px; }
     .chartHeader{
       display:flex;
@@ -100,6 +103,7 @@
       background: rgba(0,0,0,.10);
     }
 
+    /* Friend/Foe */
     .msgText{
       font-size: 18px;
       font-weight: 700;
@@ -107,6 +111,7 @@
       overflow-wrap: anywhere;
     }
 
+    /* Logos */
     .logoBox{
       display:flex;
       align-items:center;
@@ -127,6 +132,7 @@
       letter-spacing: .2px;
     }
 
+    /* Optional subtle status cue (no dot) */
     #connClass.ok  { box-shadow: inset 0 0 0 2px rgba(124,255,178,.22); }
     #connClass.bad { box-shadow: inset 0 0 0 2px rgba(255,124,124,.22); }
 
@@ -144,10 +150,14 @@
       .small{ font-size: 13.5px; }
       .big{ font-size: 40px; }
       .unit{ font-size: 12.5px; margin-left: 6px; }
+
       .meta{ display: none; }
+
       .chartWrap{ padding: 7px 11px 9px 11px; }
       canvas{ height: 105px; }
+
       .msgText{ font-size: 14.5px; }
+
       .logoBox{ min-height: 62px; padding: 7px 11px; }
       .logoBox img{ max-height: 36px; }
     }
@@ -216,7 +226,7 @@
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
           <div class="msgText" id="friendfoe">—</div>
-          <div class="meta">Tip: send it via ThingSpeak field7 numeric (1=FRIEND, 2=FOE)</div>
+          <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
         </div>
       </div>
 
@@ -236,7 +246,7 @@
 
   <script>
     const CHANNEL_ID = 3256737;  
-    const READ_API_KEY = ""; // optional
+    const READ_API_KEY = ""; 
 
     const Ambient_Temp     = "field1";
     const Core_Body_Temp   = "field2";
@@ -244,7 +254,7 @@
     const Delta            = "field4";
     const Heart_Rate       = "field5";
     const Respiration_Rate = "field6";
-    const FriendFoe        = "field7"; // NEW: numeric field for FRIEND/FOE
+    const FriendFoe        = "field7";  // <-- NEW
 
     const RESULTS = 60;
     const POLL_MS = 1000;
@@ -276,27 +286,30 @@
       const ctx = canvas.getContext("2d");
       const W = canvas.width, H = canvas.height;
       ctx.clearRect(0,0,W,H);
+
       ctx.strokeStyle = "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       for(let i=1;i<=4;i++){
         const y = (H*i)/5;
-        ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10, y); ctx.stroke();
       }
+
       const data = ys.filter(v => Number.isFinite(v));
-      if (data.length < 2){
+      if(data.length < 2){
         ctx.fillStyle = "rgba(233,238,252,0.75)";
         ctx.font = "20px system-ui";
         ctx.fillText("No ΔT data yet", 22, H/2);
         return;
       }
+
       let ymin = Math.min(...data), ymax = Math.max(...data);
-      const pad = Math.max(0.5, (ymax - ymin) * 0.15);
+      const pad = Math.max(0.5,(ymax - ymin) * 0.15);
       ymin -= pad; ymax += pad;
 
-      function xPix(i, n){ return 10 + ((W-20) * (i/(n-1))); }
-      function yPix(v){ const t = (v - ymin) / (ymax - ymin); return (H-10) - t*(H-20); }
+      function xPix(i,n){ return 10 + ((W-20) * (i/(n-1))); }
+      function yPix(v){ const t=(v-ymin)/(ymax-ymin); return (H-10)-t*(H-20); }
 
-      if (0 >= ymin && 0 <= ymax){
+      if(0 >= ymin && 0 <= ymax){
         ctx.setLineDash([10,8]);
         ctx.strokeStyle = "rgba(255,255,255,0.35)";
         ctx.beginPath(); ctx.moveTo(10, yPix(0)); ctx.lineTo(W-10, yPix(0)); ctx.stroke();
@@ -307,36 +320,40 @@
       ctx.lineWidth = 3;
       ctx.beginPath();
       const n = ys.length;
-      let started = false;
+      let started=false;
       for(let i=0;i<n;i++){
-        const v = ys[i];
-        if (!Number.isFinite(v)) continue;
-        const xp = xPix(i,n), yp = yPix(v);
-        if(!started){ ctx.moveTo(xp,yp); started = true; }
-        else ctx.lineTo(xp,yp);
+        const v=ys[i];
+        if(!Number.isFinite(v)) continue;
+        const xp=xPix(i,n), yp=yPix(v);
+        if(!started){ctx.moveTo(xp,yp);started=true;} else ctx.lineTo(xp,yp);
       }
       ctx.stroke();
     }
 
     function setupLogoFallback(imgId, phId){
-      const img = el(imgId), ph = el(phId);
-      img.onerror = () => { img.style.display="none"; ph.style.display="block"; };
+      const img=el(imgId), ph=el(phId);
+      img.onerror=()=>{ img.style.display="none"; ph.style.display="block"; };
     }
+
+    // =========================
+    // PERSISTENT FRIEND/FOE
+    // =========================
+    let lastFriendFoe = "—";
 
     async function refresh(){
       try{
-        setTopStatus(false, "loading…");
+        setTopStatus(false,"loading…");
         const res = await fetch(apiUrl(), { cache: "no-store" });
         if(!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
         const feeds = Array.isArray(data.feeds) ? data.feeds : [];
         if(feeds.length === 0){
-          setTopStatus(false, "no data");
+          setTopStatus(false,"no data");
           return;
         }
 
-        const last = feeds[feeds.length - 1];
+        const last = feeds[feeds.length-1];
 
         const core   = num(last[Core_Body_Temp]);
         const finger = num(last[Fingertip_Temp]);
@@ -351,35 +368,38 @@
         el("hr").textContent      = fmtInt(hr);
         el("resp").textContent    = fmtInt(resp);
 
-        const dtSeries = feeds.map(r => {
-          const c = num(r[Core_Body_Temp]);
-          const f = num(r[Fingertip_Temp]);
-          return (c===null || f===null) ? NaN : (c - f);
+        const dtSeries = feeds.map(r=>{
+          const c=num(r[Core_Body_Temp]);
+          const f=num(r[Fingertip_Temp]);
+          return (c===null || f===null)?NaN:(c-f);
         });
 
-        const dtNow = (core===null || finger===null) ? null : (core - finger);
+        const dtNow = (core===null || finger===null)?null:(core-finger);
         el("deltaNow").textContent = fmtDelta(dtNow);
 
-        // --- FRIEND/FOE from field7 numeric ---
+        // FRIEND/FOE field7
         const ffVal = num(last[FriendFoe]);
-        let ffText = "—";
+        let ffText = null;
         if(ffVal === 1) ffText = "FRIEND";
         else if(ffVal === 2) ffText = "FOE";
 
+        if(ffText !== null) lastFriendFoe = ffText;
+
         const ffEl = el("friendfoe");
-        ffEl.textContent = ffText;
+        ffEl.textContent = lastFriendFoe;
         ffEl.style.color = "var(--text)";
-        if(ffText === "FRIEND") ffEl.style.color = "var(--ok)";
-        else if(ffText === "FOE") ffEl.style.color = "var(--bad)";
+        if(lastFriendFoe === "FRIEND") ffEl.style.color = "var(--ok)";
+        else if(lastFriendFoe === "FOE") ffEl.style.color = "var(--bad)";
 
         const t = last.created_at ? new Date(last.created_at) : new Date();
         el("lastUpdate").textContent = t.toLocaleString();
 
         drawLineChart(el("dtChart"), dtSeries);
-        setTopStatus(true, "LIVE");
+
+        setTopStatus(true,"LIVE");
       }catch(e){
         console.error(e);
-        setTopStatus(false, `error: ${e.message}`);
+        setTopStatus(false,`error: ${e.message}`);
       }
     }
 
