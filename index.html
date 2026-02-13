@@ -186,12 +186,13 @@ const Respiration_Rate = "field6";
 const FriendFoe_Field  = "field7";
 
 const RESULTS = 60;
-const POLL_MS = 1000;  // kept at 1 second as requested
+const POLL_MS = 1000;  // 1 second polling (as requested)
 
 const el = id => document.getElementById(id);
 
 function num(x){ const v=parseFloat(x); return isFinite(v)?v:null; }
 function fmtTemp(v){ return v===null?"—":v.toFixed(1); }
+function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
 function fmtInt(v){ return v===null?"—":Math.round(v); }
 
 function apiUrl(){
@@ -201,6 +202,65 @@ function apiUrl(){
 }
 
 let lastFF = "—";   // persists until next valid 1/2
+
+function drawLineChart(canvas, ys){
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+
+  for(let i=1;i<=4;i++){
+    const y=(H*i)/5;
+    ctx.beginPath();
+    ctx.moveTo(10,y);
+    ctx.lineTo(W-10,y);
+    ctx.stroke();
+  }
+
+  const data = ys.filter(v => isFinite(v));
+  if(data.length<2){
+    ctx.fillStyle="rgba(233,238,252,0.75)";
+    ctx.font="20px system-ui";
+    ctx.fillText("No ΔT data yet",22,H/2);
+    return;
+  }
+
+  let ymin=Math.min(...data);
+  let ymax=Math.max(...data);
+  const pad=Math.max(0.5,(ymax-ymin)*0.15);
+  ymin-=pad;
+  ymax+=pad;
+
+  function xPix(i,n){ return 10 + ((W-20)*(i/(n-1))); }
+  function yPix(v){
+    const t=(v-ymin)/(ymax-ymin);
+    return (H-10)-t*(H-20);
+  }
+
+  ctx.strokeStyle="rgba(255,107,154,0.95)";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+
+  const n=ys.length;
+  let started=false;
+
+  for(let i=0;i<n;i++){
+    const v=ys[i];
+    if(!isFinite(v)) continue;
+    const xp=xPix(i,n);
+    const yp=yPix(v);
+    if(!started){
+      ctx.moveTo(xp,yp);
+      started=true;
+    } else {
+      ctx.lineTo(xp,yp);
+    }
+  }
+
+  ctx.stroke();
+}
 
 async function refresh(){
   try{
@@ -223,6 +283,20 @@ async function refresh(){
     el("hr").textContent=fmtInt(hr);
     el("resp").textContent=fmtInt(resp);
 
+    // ✅ ΔT calculation
+    const dtNow = (core===null || finger===null) ? null : (core - finger);
+    el("deltaNow").textContent = fmtDelta(dtNow);
+
+    // ✅ ΔT history series
+    const dtSeries = feeds.map(r => {
+      const c=num(r[Core_Body_Temp]);
+      const f=num(r[Fingertip_Temp]);
+      return (c===null||f===null)?NaN:(c-f);
+    });
+
+    drawLineChart(el("dtChart"), dtSeries);
+
+    // ✅ FRIEND / FOE logic
     const rawFF=last[FriendFoe_Field];
     const ffNum=parseInt(rawFF);
 
