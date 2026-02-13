@@ -173,7 +173,7 @@
         </div>
         <div class="cell" id="connClass">
           <div class="headerTitle">Biometrics Dashboard</div>
-          <div class="small" id="connState">LIVE</div> <!-- Updated text -->
+          <div class="small" id="connState">LIVE</div> <!-- Updated text here -->
           <div class="meta">Last update: <span id="lastUpdate">—</span></div>
         </div>
       </div>
@@ -182,7 +182,7 @@
       <div class="row one">
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
-          <div class="msgText" id="friendfoe">—</div>
+          <div class="msgText" id="friendfoe">—</div> <!-- Friend/Foe status here -->
           <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
         </div>
       </div>
@@ -249,7 +249,7 @@
     }
 
     refresh();
-    setInterval(refresh,POLL_MS);
+    setInterval(refresh,POLL_MS);  // Polling interval remains the same (1 second)
   </script>
 </body>
 </html>
