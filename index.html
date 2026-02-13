@@ -173,43 +173,8 @@
         </div>
         <div class="cell" id="connClass">
           <div class="headerTitle">Biometrics Dashboard</div>
-          <div class="small" id="connState">starting…</div>
+          <div class="small" id="connState">LIVE</div> <!-- Updated text -->
           <div class="meta">Last update: <span id="lastUpdate">—</span></div>
-        </div>
-      </div>
-
-      <!-- Core + Finger -->
-      <div class="row two">
-        <div class="cell">
-          <div class="label">CORE T°C</div>
-          <div><span class="big" id="core">—</span><span class="unit">°C</span></div>
-        </div>
-        <div class="cell">
-          <div class="label">Fingertip T°C</div>
-          <div><span class="big" id="finger">—</span><span class="unit">°C</span></div>
-        </div>
-      </div>
-
-      <!-- Chart -->
-      <div class="row one">
-        <div class="chartWrap">
-          <div class="chartHeader">
-            <div class="label" style="margin:0;">ΔT°C (Core − Fingertip)</div>
-            <div class="small">ΔT: <span id="deltaNow">—</span><span class="unit">°C</span></div>
-          </div>
-          <canvas id="dtChart" width="900" height="340"></canvas>
-        </div>
-      </div>
-
-      <!-- HR + RESP -->
-      <div class="row two">
-        <div class="cell">
-          <div class="label">HR (bpm)</div>
-          <div><span class="big" id="hr">—</span></div>
-        </div>
-        <div class="cell">
-          <div class="label">RESP (/min)</div>
-          <div><span class="big" id="resp">—</span></div>
         </div>
       </div>
 
@@ -238,81 +203,24 @@
   </div>
 
   <script>
-
     const CHANNEL_ID = 3256737;
-    const READ_API_KEY = "";
+    const READ_API_KEY = "3LO8XXLP4L2PCPLJ";  // ThingSpeak Read API Key
 
-    const Ambient_Temp     = "field1";
-    const Core_Body_Temp   = "field2";
-    const Fingertip_Temp   = "field3";
-    const Heart_Rate       = "field5";
-    const Respiration_Rate = "field6";
-    const FriendFoe_Field  = "field7";
+    const FriendFoe_Field = "field7";
 
-    const RESULTS = 60;
     const POLL_MS = 1000;
 
     const el = id => document.getElementById(id);
 
     function num(x){ const v=parseFloat(x); return isFinite(v)?v:null; }
-    function fmtTemp(v){ return v===null?"—":v.toFixed(1); }
-    function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
-    function fmtInt(v){ return v===null?"—":Math.round(v); }
 
     function apiUrl(){
-      let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+      let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=1`;
       if(READ_API_KEY) url+=`&api_key=${encodeURIComponent(READ_API_KEY)}`;
       return url;
     }
 
     let lastFF="—";
-
-    function drawLineChart(canvas, ys){
-      const ctx=canvas.getContext("2d");
-      const W=canvas.width,H=canvas.height;
-      ctx.clearRect(0,0,W,H);
-
-      ctx.strokeStyle="rgba(255,255,255,0.12)";
-      ctx.lineWidth=1;
-      for(let i=1;i<=4;i++){
-        const y=(H*i)/5;
-        ctx.beginPath();
-        ctx.moveTo(10,y);
-        ctx.lineTo(W-10,y);
-        ctx.stroke();
-      }
-
-      const data=ys.filter(v=>isFinite(v));
-      if(data.length<2){
-        ctx.fillStyle="rgba(233,238,252,0.75)";
-        ctx.font="20px system-ui";
-        ctx.fillText("No ΔT data yet",22,H/2);
-        return;
-      }
-
-      let ymin=Math.min(...data);
-      let ymax=Math.max(...data);
-      const pad=Math.max(0.5,(ymax-ymin)*0.15);
-      ymin-=pad; ymax+=pad;
-
-      function xPix(i,n){ return 10+((W-20)*(i/(n-1))); }
-      function yPix(v){ const t=(v-ymin)/(ymax-ymin); return (H-10)-t*(H-20); }
-
-      ctx.strokeStyle="rgba(255,107,154,0.95)";
-      ctx.lineWidth=3;
-      ctx.beginPath();
-
-      const n=ys.length;
-      let started=false;
-      for(let i=0;i<n;i++){
-        const v=ys[i];
-        if(!isFinite(v)) continue;
-        const xp=xPix(i,n), yp=yPix(v);
-        if(!started){ctx.moveTo(xp,yp);started=true;}
-        else ctx.lineTo(xp,yp);
-      }
-      ctx.stroke();
-    }
 
     async function refresh(){
       try{
@@ -322,29 +230,6 @@
         if(!feeds.length) return;
 
         const last=feeds[feeds.length-1];
-
-        const core=num(last[Core_Body_Temp]);
-        const finger=num(last[Fingertip_Temp]);
-        const amb=num(last[Ambient_Temp]);
-        const hr=num(last[Heart_Rate]);
-        const resp=num(last[Respiration_Rate]);
-
-        el("ambient").textContent=fmtTemp(amb);
-        el("core").textContent=fmtTemp(core);
-        el("finger").textContent=fmtTemp(finger);
-        el("hr").textContent=fmtInt(hr);
-        el("resp").textContent=fmtInt(resp);
-
-        const dtNow=(core===null||finger===null)?null:(core-finger);
-        el("deltaNow").textContent=fmtDelta(dtNow);
-
-        const dtSeries=feeds.map(r=>{
-          const c=num(r[Core_Body_Temp]);
-          const f=num(r[Fingertip_Temp]);
-          return (c===null||f===null)?NaN:(c-f);
-        });
-
-        drawLineChart(el("dtChart"),dtSeries);
 
         const rawFF=last[FriendFoe_Field];
         const ffNum=parseInt(rawFF);
@@ -365,7 +250,6 @@
 
     refresh();
     setInterval(refresh,POLL_MS);
-
   </script>
 </body>
 </html>
