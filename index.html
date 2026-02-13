@@ -127,7 +127,7 @@
       font-weight:700;
     }
 
-    #connClass.ok  { box-shadow: inset 0 0 0 1.8px rgba(124,255,178,.22); }
+    #connClass.ok { box-shadow: inset 0 0 0 1.8px rgba(124,255,178,.22); }
     #connClass.bad { box-shadow: inset 0 0 0 1.8px rgba(255,124,124,.22); }
 
     @media (orientation: portrait) and (max-width: 560px){
@@ -172,7 +172,7 @@
         </div>
         <div class="cell" id="connClass">
           <div class="headerTitle">Biometrics Dashboard</div>
-          <div class="small" id="connState">LIVE</div> <!-- Changed "starting" to "LIVE" -->
+          <div class="small" id="connState">starting…</div> <!-- Starting text remains as is -->
           <div class="meta">Last update: <span id="lastUpdate">—</span></div>
         </div>
       </div>
@@ -216,8 +216,8 @@
       <div class="row one">
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
-          <div class="msgText" id="friendfoe">—</div>
-          <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
+          <div class="msgText" id="friendfoe">—</div> <!-- Updated for Friend/Foe -->
+          <div class="meta">Tip: send it via ThingSpeak “field1=” in your update request.</div>
         </div>
       </div>
 
@@ -237,85 +237,91 @@
   </div>
 
   <script>
-    const CHANNEL_ID = 3256737;  // Updated channel ID
-    const READ_API_KEY = "3LO8XXLP4L2PCPLJ";  // New API key
-
-    const Ambient_Temp     = "field1";
-    const Core_Body_Temp   = "field2";
-    const Fingertip_Temp   = "field3";
-    const Heart_Rate       = "field5";
-    const Respiration_Rate = "field6";
-    const FriendFoe_Field  = "field7";
+    const CHANNEL_ID = 3256737;  // This is your current channel ID
+    const READ_API_KEY = "3LO8XXLP4L2PCPLJ";  // The new API key you provided
+    const FriendFoe_Field = "field1";  // Fetching Friend/Foe from Field 1 of the new channel
 
     const RESULTS = 60;
     const POLL_MS = 1000;
 
     const el = id => document.getElementById(id);
 
-    function num(x){ const v=parseFloat(x); return isFinite(v)?v:null; }
-    function fmtTemp(v){ return v===null?"—":v.toFixed(1); }
-    function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
-    function fmtInt(v){ return v===null?"—":Math.round(v); }
+    function num(x) { const v = parseFloat(x); return isFinite(v) ? v : null; }
+    function fmtTemp(v) { return v === null ? "—" : v.toFixed(1); }
+    function fmtDelta(v) { return v === null ? "—" : v.toFixed(2); }
+    function fmtInt(v) { return v === null ? "—" : Math.round(v); }
 
-    function apiUrl(){
-      let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
-      if(READ_API_KEY) url+=`&api_key=${encodeURIComponent(READ_API_KEY)}`;
+    function apiUrl() {
+      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+      if (READ_API_KEY) url += `&api_key=${encodeURIComponent(READ_API_KEY)}`;
       return url;
     }
 
-    let lastFF="—";
+    let lastFF = "—";
 
-    async function refresh(){
-      try{
-        const res=await fetch(apiUrl(),{cache:"no-store"});
-        const data=await res.json();
-        const feeds=data.feeds||[];
-        if(!feeds.length) return;
+    async function refresh() {
+      try {
+        const res = await fetch(apiUrl(), { cache: "no-store" });
+        const data = await res.json();
+        const feeds = data.feeds || [];
+        if (!feeds.length) return;
 
-        const last=feeds[feeds.length-1];
+        const last = feeds[feeds.length - 1];
 
-        const core=num(last[Core_Body_Temp]);
-        const finger=num(last[Fingertip_Temp]);
-        const amb=num(last[Ambient_Temp]);
-        const hr=num(last[Heart_Rate]);
-        const resp=num(last[Respiration_Rate]);
+        // Fetch Friend/Foe status from Field 1 of the new channel
+        const rawFF = last[FriendFoe_Field];
+        const ffNum = parseInt(rawFF);
 
-        el("ambient").textContent=fmtTemp(amb);
-        el("core").textContent=fmtTemp(core);
-        el("finger").textContent=fmtTemp(finger);
-        el("hr").textContent=fmtInt(hr);
-        el("resp").textContent=fmtInt(resp);
+        if (ffNum === 1) {
+          lastFF = "FRIEND";
+        } else if (ffNum === 2) {
+          lastFF = "FOE";
+        } else {
+          lastFF = "—";
+        }
 
-        const dtNow=(core===null||finger===null)?null:(core-finger);
-        el("deltaNow").textContent=fmtDelta(dtNow);
+        const ffEl = el("friendfoe");
+        ffEl.textContent = lastFF;
 
-        const dtSeries=feeds.map(r=>{
-          const c=num(r[Core_Body_Temp]);
-          const f=num(r[Fingertip_Temp]);
-          return (c===null||f===null)?NaN:(c-f);
+        if (lastFF === "FRIEND") {
+          ffEl.style.color = "var(--ok)";
+        } else if (lastFF === "FOE") {
+          ffEl.style.color = "var(--bad)";
+        }
+
+        // Handle other fields
+        const core = num(last["field2"]);
+        const finger = num(last["field3"]);
+        const amb = num(last["field1"]);
+        const hr = num(last["field5"]);
+        const resp = num(last["field6"]);
+
+        el("ambient").textContent = fmtTemp(amb);
+        el("core").textContent = fmtTemp(core);
+        el("finger").textContent = fmtTemp(finger);
+        el("hr").textContent = fmtInt(hr);
+        el("resp").textContent = fmtInt(resp);
+
+        const dtNow = (core === null || finger === null) ? null : (core - finger);
+        el("deltaNow").textContent = fmtDelta(dtNow);
+
+        const dtSeries = feeds.map(r => {
+          const c = num(r["field2"]);
+          const f = num(r["field3"]);
+          return (c === null || f === null) ? NaN : (c - f);
         });
 
-        drawLineChart(el("dtChart"),dtSeries);
+        drawLineChart(el("dtChart"), dtSeries);
 
-        const rawFF=last[FriendFoe_Field];
-        const ffNum=parseInt(rawFF);
+        el("lastUpdate").textContent = new Date(last.created_at).toLocaleString();
 
-        if(ffNum===1) lastFF="FRIEND";
-        else if(ffNum===2) lastFF="FOE";
-
-        const ffEl=el("friendfoe");
-        ffEl.textContent=lastFF;
-
-        if(lastFF==="FRIEND") ffEl.style.color="var(--ok)";
-        else if(lastFF==="FOE") ffEl.style.color="var(--bad)";
-
-        el("lastUpdate").textContent=new Date(last.created_at).toLocaleString();
-
-      }catch(e){ console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     refresh();
-    setInterval(refresh,POLL_MS);  // Update every second
+    setInterval(refresh, POLL_MS);
   </script>
 </body>
 </html>
