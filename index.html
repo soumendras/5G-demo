@@ -80,6 +80,7 @@
 <body>
     <div class="wrap">
         <div class="board">
+            <!-- Top Row -->
             <div class="row two">
                 <div class="cell">
                     <div class="label">Ambient T°C</div>
@@ -92,6 +93,7 @@
                     <div class="meta">Last update: <span id="lastUpdate">—</span></div>
                 </div>
             </div>
+            <!-- Core + Finger -->
             <div class="row two">
                 <div class="cell">
                     <div class="label">CORE T°C</div>
@@ -102,6 +104,7 @@
                     <div><span class="big" id="finger">—</span><span class="unit">°C</span></div>
                 </div>
             </div>
+            <!-- Chart -->
             <div class="row one">
                 <div class="chartWrap">
                     <div class="chartHeader">
@@ -111,6 +114,7 @@
                     <canvas id="dtChart" width="900" height="340"></canvas>
                 </div>
             </div>
+            <!-- HR + RESP -->
             <div class="row two">
                 <div class="cell">
                     <div class="label">HR (bpm)</div>
@@ -121,6 +125,7 @@
                     <div><span class="big" id="resp">—</span></div>
                 </div>
             </div>
+            <!-- Friend/Foe -->
             <div class="row one">
                 <div class="cell">
                     <div class="label">Messages: Friend/Foe</div>
@@ -128,6 +133,7 @@
                     <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
                 </div>
             </div>
+            <!-- Logos -->
             <div class="row two">
                 <div class="cell logoBox">
                     <img id="logo1" src="./ualberta.png" alt="UAlberta logo" />
@@ -161,9 +167,8 @@
         function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
         function fmtInt(v){ return v===null?"—":Math.round(v); }
         function apiUrl(){
-            // FIXED: Using template literals (backticks) for the URL
-            let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
-            if(READ_API_KEY) url += `&api_key=${encodeURIComponent(READ_API_KEY)}`;
+            let url=https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS};
+            if(READ_API_KEY) url+=&api_key=${encodeURIComponent(READ_API_KEY)};
             return url;
         }
 
@@ -248,20 +253,8 @@
                 ffEl.textContent=lastFF;
                 if(lastFF==="FRIEND") ffEl.style.color="var(--ok)";
                 else if(lastFF==="FOE") ffEl.style.color="var(--bad)";
-                
                 el("lastUpdate").textContent=new Date(last.created_at).toLocaleString();
-                
-                // Update Connection State UI
-                el("connState").textContent = "Connected (Live)";
-                el("connClass").classList.add("ok");
-                el("connClass").classList.remove("bad");
-
-            }catch(e){ 
-                console.error(e); 
-                el("connState").textContent = "Disconnected (Error)";
-                el("connClass").classList.add("bad");
-                el("connClass").classList.remove("ok");
-            }
+            }catch(e){ console.error(e); }
         }
 
         refresh();
