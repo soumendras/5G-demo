@@ -264,11 +264,12 @@
     const READ_API_KEY = ""; // Replace with your ThingSpeak Read API Key (if private)
 
     // Field mapping
-    const F_CORE    = "field1";
-    const F_FINGER  = "field2";
-    const F_AMBIENT = "field3";
-    const F_HR      = "field4";
-    const F_RESP    = "field5";
+    const Ambient_Temp     = "field1";
+    const Core_Body_Temp   = "field2";
+    const Fingertip_Temp   = "field3";
+    const Delta            = "field4";
+    const Heart_Rate       = "field5";
+    const Respiration_Rate = "field6";
 
     const RESULTS = 60;
     const POLL_MS = 1000;
@@ -372,11 +373,11 @@
 
         const last = feeds[feeds.length - 1];
 
-        const core   = num(last[F_CORE]);
-        const finger = num(last[F_FINGER]);
-        const amb    = num(last[F_AMBIENT]);
-        const hr     = num(last[F_HR]);
-        const resp   = num(last[F_RESP]);
+        const core   = num(last[Core_Body_Temp]);
+        const finger = num(last[Fingertip_Temp]);
+        const amb    = num(last[Ambient_Temp]);
+        const hr     = num(last[Heart_Rate]);
+        const resp   = num(last[Respiration_Rate]);
 
         el("ch").textContent = CHANNEL_ID;
         el("ambient").textContent = fmtTemp(amb);
@@ -386,8 +387,8 @@
         el("resp").textContent    = fmtInt(resp);
 
         const dtSeries = feeds.map(r => {
-          const c = num(r[F_CORE]);
-          const f = num(r[F_FINGER]);
+          const c = num(r[Core_Body_Temp]);
+          const f = num(r[Fingertip_Temp]);
           return (c===null || f===null) ? NaN : (c - f);
         });
 
