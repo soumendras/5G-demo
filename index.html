@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Biometrics Dashboard</title>
-
   <style>
     :root{
       --bg:#0b1220;
@@ -173,8 +172,43 @@
         </div>
         <div class="cell" id="connClass">
           <div class="headerTitle">Biometrics Dashboard</div>
-          <div class="small" id="connState">LIVE</div> <!-- Updated text here -->
+          <div class="small" id="connState">LIVE</div> <!-- Changed "starting" to "LIVE" -->
           <div class="meta">Last update: <span id="lastUpdate">—</span></div>
+        </div>
+      </div>
+
+      <!-- Core + Finger -->
+      <div class="row two">
+        <div class="cell">
+          <div class="label">CORE T°C</div>
+          <div><span class="big" id="core">—</span><span class="unit">°C</span></div>
+        </div>
+        <div class="cell">
+          <div class="label">Fingertip T°C</div>
+          <div><span class="big" id="finger">—</span><span class="unit">°C</span></div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="row one">
+        <div class="chartWrap">
+          <div class="chartHeader">
+            <div class="label" style="margin:0;">ΔT°C (Core − Fingertip)</div>
+            <div class="small">ΔT: <span id="deltaNow">—</span><span class="unit">°C</span></div>
+          </div>
+          <canvas id="dtChart" width="900" height="340"></canvas>
+        </div>
+      </div>
+
+      <!-- HR + RESP -->
+      <div class="row two">
+        <div class="cell">
+          <div class="label">HR (bpm)</div>
+          <div><span class="big" id="hr">—</span></div>
+        </div>
+        <div class="cell">
+          <div class="label">RESP (/min)</div>
+          <div><span class="big" id="resp">—</span></div>
         </div>
       </div>
 
@@ -182,7 +216,7 @@
       <div class="row one">
         <div class="cell">
           <div class="label">Messages: Friend/Foe</div>
-          <div class="msgText" id="friendfoe">—</div> <!-- Friend/Foe status here -->
+          <div class="msgText" id="friendfoe">—</div>
           <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
         </div>
       </div>
@@ -203,19 +237,28 @@
   </div>
 
   <script>
-    const CHANNEL_ID = 3256737;
-    const READ_API_KEY = "3LO8XXLP4L2PCPLJ";  // ThingSpeak Read API Key
+    const CHANNEL_ID = 3256737;  // Updated channel ID
+    const READ_API_KEY = "3LO8XXLP4L2PCPLJ";  // New API key
 
-    const FriendFoe_Field = "field7";
+    const Ambient_Temp     = "field1";
+    const Core_Body_Temp   = "field2";
+    const Fingertip_Temp   = "field3";
+    const Heart_Rate       = "field5";
+    const Respiration_Rate = "field6";
+    const FriendFoe_Field  = "field7";
 
+    const RESULTS = 60;
     const POLL_MS = 1000;
 
     const el = id => document.getElementById(id);
 
     function num(x){ const v=parseFloat(x); return isFinite(v)?v:null; }
+    function fmtTemp(v){ return v===null?"—":v.toFixed(1); }
+    function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
+    function fmtInt(v){ return v===null?"—":Math.round(v); }
 
     function apiUrl(){
-      let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=1`;
+      let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
       if(READ_API_KEY) url+=`&api_key=${encodeURIComponent(READ_API_KEY)}`;
       return url;
     }
@@ -230,6 +273,29 @@
         if(!feeds.length) return;
 
         const last=feeds[feeds.length-1];
+
+        const core=num(last[Core_Body_Temp]);
+        const finger=num(last[Fingertip_Temp]);
+        const amb=num(last[Ambient_Temp]);
+        const hr=num(last[Heart_Rate]);
+        const resp=num(last[Respiration_Rate]);
+
+        el("ambient").textContent=fmtTemp(amb);
+        el("core").textContent=fmtTemp(core);
+        el("finger").textContent=fmtTemp(finger);
+        el("hr").textContent=fmtInt(hr);
+        el("resp").textContent=fmtInt(resp);
+
+        const dtNow=(core===null||finger===null)?null:(core-finger);
+        el("deltaNow").textContent=fmtDelta(dtNow);
+
+        const dtSeries=feeds.map(r=>{
+          const c=num(r[Core_Body_Temp]);
+          const f=num(r[Fingertip_Temp]);
+          return (c===null||f===null)?NaN:(c-f);
+        });
+
+        drawLineChart(el("dtChart"),dtSeries);
 
         const rawFF=last[FriendFoe_Field];
         const ffNum=parseInt(rawFF);
@@ -249,7 +315,7 @@
     }
 
     refresh();
-    setInterval(refresh,POLL_MS);  // Polling interval remains the same (1 second)
+    setInterval(refresh,POLL_MS);  // Update every second
   </script>
 </body>
 </html>
