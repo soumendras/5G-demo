@@ -125,7 +125,7 @@
                 <div class="cell">
                     <div class="label">Messages: Friend/Foe</div>
                     <div class="msgText" id="friendfoe">—</div>
-                    <div class="meta">Tip: send it via ThingSpeak “field7=” in your update request.</div>
+                    <div class="meta">Tip: send it via ThingSpeak “field1=” to the new FF channel request.</div>
                 </div>
             </div>
             <div class="row two">
@@ -141,6 +141,7 @@
         </div>
     </div>
     <script>
+        // Main Biometrics Channel
         const CHANNEL_ID = 3256737;
         const READ_API_KEY = "";
         const Ambient_Temp = "field1";
@@ -148,7 +149,12 @@
         const Fingertip_Temp = "field3";
         const Heart_Rate = "field5";
         const Respiration_Rate = "field6";
-        const FriendFoe_Field = "field7";
+
+        // New Friend/Foe Channel
+        const FF_CHANNEL_ID = "3263898"; // <--- REPLACE THIS WITH YOUR NEW CHANNEL ID
+        const FF_READ_API_KEY = "3LO8XXLP4L2PCPLJ";
+        const FriendFoe_Field = "field1";
+
         const RESULTS = 60;
         const POLL_MS = 1000;
         const el = id => document.getElementById(id);
@@ -160,9 +166,17 @@
         function fmtTemp(v){ return v===null?"—":v.toFixed(1); }
         function fmtDelta(v){ return v===null?"—":v.toFixed(2); }
         function fmtInt(v){ return v===null?"—":Math.round(v); }
+        
         function apiUrl(){
             let url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
             if(READ_API_KEY) url+=`&api_key=${encodeURIComponent(READ_API_KEY)}`;
+            return url;
+        }
+
+        function ffApiUrl(){
+            // Fetching just 1 result since we only need the latest Friend/Foe status
+            let url=`https://api.thingspeak.com/channels/${FF_CHANNEL_ID}/feeds.json?results=1`;
+            if(FF_READ_API_KEY) url+=`&api_key=${encodeURIComponent(FF_READ_API_KEY)}`;
             return url;
         }
 
@@ -212,43 +226,60 @@
 
         async function refresh(){
             try{
-                const res=await fetch(apiUrl(),{cache:"no-store"});
-                const data=await res.json();
-                const feeds=data.feeds||[];
-                if(!feeds.length) return;
-                const last=feeds[feeds.length-1];
-                const core=num(last[Core_Body_Temp]);
-                const finger=num(last[Fingertip_Temp]);
-                const amb=num(last[Ambient_Temp]);
-                const hr=num(last[Heart_Rate]);
-                const resp=num(last[Respiration_Rate]);
+                // Fetch from both channels at the same time
+                const [res, ffRes] = await Promise.all([
+                    fetch(apiUrl(),{cache:"no-store"}),
+                    fetch(ffApiUrl(),{cache:"no-store"})
+                ]);
+                
+                const data = await res.json();
+                const ffData = await ffRes.json();
 
-                el("ambient").textContent=fmtTemp(amb);
-                el("core").textContent=fmtTemp(core);
-                el("finger").textContent=fmtTemp(finger);
-                el("hr").textContent=fmtInt(hr);
-                el("resp").textContent=fmtInt(resp);
+                // Process Main Biometrics
+                const feeds = data.feeds||[];
+                if(feeds.length){
+                    const last = feeds[feeds.length-1];
+                    const core = num(last[Core_Body_Temp]);
+                    const finger = num(last[Fingertip_Temp]);
+                    const amb = num(last[Ambient_Temp]);
+                    const hr = num(last[Heart_Rate]);
+                    const resp = num(last[Respiration_Rate]);
 
-                const dtNow=(core===null||finger===null)?null:(core-finger);
-                el("deltaNow").textContent=fmtDelta(dtNow);
+                    el("ambient").textContent=fmtTemp(amb);
+                    el("core").textContent=fmtTemp(core);
+                    el("finger").textContent=fmtTemp(finger);
+                    el("hr").textContent=fmtInt(hr);
+                    el("resp").textContent=fmtInt(resp);
 
-                const dtSeries=feeds.map(r=>{
-                    const c=num(r[Core_Body_Temp]);
-                    const f=num(r[Fingertip_Temp]);
-                    return (c===null||f===null)?NaN:(c-f);
-                });
-                drawLineChart(el("dtChart"),dtSeries);
+                    const dtNow = (core===null||finger===null) ? null : (core-finger);
+                    el("deltaNow").textContent=fmtDelta(dtNow);
 
-                const rawFF=last[FriendFoe_Field];
-                const ffNum=parseInt(rawFF);
-                if(ffNum===1) lastFF="FRIEND";
-                else if(ffNum===2) lastFF="FOE";
+                    const dtSeries=feeds.map(r=>{
+                        const c=num(r[Core_Body_Temp]);
+                        const f=num(r[Fingertip_Temp]);
+                        return (c===null||f===null)?NaN:(c-f);
+                    });
+                    drawLineChart(el("dtChart"),dtSeries);
+                    
+                    el("lastUpdate").textContent=new Date(last.created_at).toLocaleString();
+                }
+
+                // Process Friend/Foe
+                const ffFeeds = ffData.feeds||[];
+                if(ffFeeds.length){
+                    const lastFFEntry = ffFeeds[ffFeeds.length-1];
+                    const rawFF = lastFFEntry[FriendFoe_Field]; // looks at field 1
+                    const ffNum = parseInt(rawFF);
+                    
+                    // Persist logic remains identical
+                    if(ffNum===1) lastFF="FRIEND";
+                    else if(ffNum===2) lastFF="FOE";
+                }
+
                 const ffEl=el("friendfoe");
                 ffEl.textContent=lastFF;
                 if(lastFF==="FRIEND") ffEl.style.color="var(--ok)";
                 else if(lastFF==="FOE") ffEl.style.color="var(--bad)";
-                
-                el("lastUpdate").textContent=new Date(last.created_at).toLocaleString();
                 
                 // Keep UI connected if successful
                 el("connState").textContent = "Connected (Live)";
