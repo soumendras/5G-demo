@@ -158,9 +158,9 @@
         const RESULTS = 60;
         const POLL_MS = 1000;
         
-        // --- TWEAK THIS VALUE TO CHANGE THE TIMEOUT ---
-        // 10000 = 10 seconds. 15000 = 15 seconds, etc.
-        const STALE_TIMEOUT_MS = 10000; 
+        // --- TWEAK THIS VALUE TO CHANGE THE STAGNANT DATA TIMEOUT ---
+        // 20000 = 20 seconds
+        const STAGNANT_TIMEOUT_MS = 20000; 
         
         const el = id => document.getElementById(id);
 
@@ -237,31 +237,59 @@
                 
                 const data = await res.json();
                 const ffData = await ffRes.json();
-                const now = new Date();
+                const now = Date.now();
 
                 // Process Main Biometrics
                 const feeds = data.feeds||[];
                 if(feeds.length){
-                    const last = feeds[feeds.length-1];
-                    const lastTime = new Date(last.created_at);
+                    const newest = feeds[feeds.length-1];
+                    const newestTime = new Date(newest.created_at).getTime();
                     
-                    // Check if the data is older than our custom timeout
-                    const isStale = (now - lastTime) > STALE_TIMEOUT_MS; 
+                    // 1. Look backwards to find how long the exact same numbers have been repeating
+                    let streakStartTime = newestTime; 
+                    
+                    for (let i = feeds.length - 1; i >= 0; i--) {
+                        const r = feeds[i];
+                        // If all 5 fields match the newest entry perfectly...
+                        if (
+                            r[Ambient_Temp] === newest[Ambient_Temp] &&
+                            r[Core_Body_Temp] === newest[Core_Body_Temp] &&
+                            r[Fingertip_Temp] === newest[Fingertip_Temp] &&
+                            r[Heart_Rate] === newest[Heart_Rate] &&
+                            r[Respiration_Rate] === newest[Respiration_Rate]
+                        ) {
+                            streakStartTime = new Date(r.created_at).getTime();
+                        } else {
+                            // The streak breaks here (we found older, different data)
+                            break; 
+                        }
+                    }
 
-                    if (isStale) {
+                    // 2. Check if the streak is older than 20 seconds OR if the receiver just shut off
+                    const isStagnant = (now - streakStartTime) > STAGNANT_TIMEOUT_MS;
+                    const isOffline = (now - newestTime) > STAGNANT_TIMEOUT_MS;
+
+                    if (isStagnant || isOffline) {
                         el("ambient").textContent = "NaN";
                         el("core").textContent = "NaN";
                         el("finger").textContent = "NaN";
                         el("hr").textContent = "NaN";
                         el("resp").textContent = "NaN";
                         el("deltaNow").textContent = "NaN";
-                        el("lastUpdate").textContent = lastTime.toLocaleString() + " (Stale)";
+                        
+                        // Let the user know the receiver is frozen vs disconnected
+                        if(isOffline) {
+                            el("lastUpdate").textContent = new Date(newestTime).toLocaleString() + " (Offline)";
+                        } else {
+                            el("lastUpdate").textContent = new Date(newestTime).toLocaleString() + " (Sensor Frozen)";
+                        }
+                        
                     } else {
-                        const core = num(last[Core_Body_Temp]);
-                        const finger = num(last[Fingertip_Temp]);
-                        const amb = num(last[Ambient_Temp]);
-                        const hr = num(last[Heart_Rate]);
-                        const resp = num(last[Respiration_Rate]);
+                        const core = num(newest[Core_Body_Temp]);
+                        const finger = num(newest[Fingertip_Temp]);
+                        const amb = num(newest[Ambient_Temp]);
+                        const hr = num(newest[Heart_Rate]);
+                        const resp = num(newest[Respiration_Rate]);
 
                         el("ambient").textContent=fmtTemp(amb);
                         el("core").textContent=fmtTemp(core);
@@ -271,7 +299,7 @@
 
                         const dtNow = (core===null||finger===null) ? null : (core-finger);
                         el("deltaNow").textContent=fmtDelta(dtNow);
-                        el("lastUpdate").textContent=lastTime.toLocaleString();
+                        el("lastUpdate").textContent=new Date(newestTime).toLocaleString();
                     }
 
                     // Keep rendering the historical chart regardless of current staleness
