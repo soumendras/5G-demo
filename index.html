@@ -158,8 +158,7 @@
         const RESULTS = 60;
         const POLL_MS = 1000;
         
-        // --- TWEAK THIS VALUE TO CHANGE THE STAGNANT DATA TIMEOUT ---
-        // 20000 = 20 seconds
+        // Timeout variables
         const STAGNANT_TIMEOUT_MS = 20000; 
         
         const el = id => document.getElementById(id);
@@ -242,76 +241,105 @@
                 // Process Main Biometrics
                 const feeds = data.feeds||[];
                 if(feeds.length){
-                    const newest = feeds[feeds.length-1];
-                    const newestTime = new Date(newest.created_at).getTime();
                     
-                    // 1. Look backwards to find how long the exact same numbers have been repeating
-                    let streakStartTime = newestTime; 
-                    
+                    // 1. Find the newest feed that IS NOT entirely zeros (ignore hardware resets)
+                    let validFeed = null;
+                    let validIndex = -1;
+
                     for (let i = feeds.length - 1; i >= 0; i--) {
                         const r = feeds[i];
-                        // If all 5 fields match the newest entry perfectly...
-                        if (
-                            r[Ambient_Temp] === newest[Ambient_Temp] &&
-                            r[Core_Body_Temp] === newest[Core_Body_Temp] &&
-                            r[Fingertip_Temp] === newest[Fingertip_Temp] &&
-                            r[Heart_Rate] === newest[Heart_Rate] &&
-                            r[Respiration_Rate] === newest[Respiration_Rate]
-                        ) {
-                            streakStartTime = new Date(r.created_at).getTime();
+                        const a = num(r[Ambient_Temp]);
+                        const c = num(r[Core_Body_Temp]);
+                        const f = num(r[Fingertip_Temp]);
+                        const h = num(r[Heart_Rate]);
+                        const re = num(r[Respiration_Rate]);
+                        
+                        // If all are zero, it's a reboot. Skip it.
+                        if (a === 0 && c === 0 && f === 0 && h === 0 && re === 0) {
+                            continue; 
                         } else {
-                            // The streak breaks here (we found older, different data)
-                            break; 
+                            validFeed = r;
+                            validIndex = i;
+                            break;
                         }
                     }
 
-                    // 2. Check if the streak is older than 20 seconds OR if the receiver just shut off
-                    const isStagnant = (now - streakStartTime) > STAGNANT_TIMEOUT_MS;
-                    const isOffline = (now - newestTime) > STAGNANT_TIMEOUT_MS;
-
-                    if (isStagnant || isOffline) {
-                        el("ambient").textContent = "NaN";
-                        el("core").textContent = "NaN";
-                        el("finger").textContent = "NaN";
-                        el("hr").textContent = "NaN";
-                        el("resp").textContent = "NaN";
-                        el("deltaNow").textContent = "NaN";
-                        
-                        // Let the user know the receiver is frozen vs disconnected
-                        if(isOffline) {
-                            el("lastUpdate").textContent = new Date(newestTime).toLocaleString() + " (Offline)";
-                        } else {
-                            el("lastUpdate").textContent = new Date(newestTime).toLocaleString() + " (Sensor Frozen)";
-                        }
-                        
+                    if (!validFeed) {
+                        // Edge case: ALL 60 historical readings were zeros
+                        const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
+                        fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
+                        el("lastUpdate").textContent = "Hardware Rebooting...";
                     } else {
-                        const core = num(newest[Core_Body_Temp]);
-                        const finger = num(newest[Fingertip_Temp]);
-                        const amb = num(newest[Ambient_Temp]);
-                        const hr = num(newest[Heart_Rate]);
-                        const resp = num(newest[Respiration_Rate]);
+                        const validTime = new Date(validFeed.created_at).getTime();
+                        
+                        // 2. Look backwards from our valid feed to find how long this specific data has been repeating
+                        let streakStartTime = validTime; 
+                        
+                        for (let i = validIndex; i >= 0; i--) {
+                            const r = feeds[i];
+                            if (
+                                r[Ambient_Temp] === validFeed[Ambient_Temp] &&
+                                r[Core_Body_Temp] === validFeed[Core_Body_Temp] &&
+                                r[Fingertip_Temp] === validFeed[Fingertip_Temp] &&
+                                r[Heart_Rate] === validFeed[Heart_Rate] &&
+                                r[Respiration_Rate] === validFeed[Respiration_Rate]
+                            ) {
+                                streakStartTime = new Date(r.created_at).getTime();
+                            } else {
+                                break; 
+                            }
+                        }
 
-                        el("ambient").textContent=fmtTemp(amb);
-                        el("core").textContent=fmtTemp(core);
-                        el("finger").textContent=fmtTemp(finger);
-                        el("hr").textContent=fmtInt(hr);
-                        el("resp").textContent=fmtInt(resp);
+                        // 3. Apply the 20-second timeout to the VALID data
+                        const isStagnant = (now - streakStartTime) > STAGNANT_TIMEOUT_MS;
+                        
+                        // Also check if the "last known valid data" is older than 20 seconds.
+                        // (This handles the case where the hardware takes more than 20 seconds to boot up)
+                        const isOffline = (now - validTime) > STAGNANT_TIMEOUT_MS;
 
-                        const dtNow = (core===null||finger===null) ? null : (core-finger);
-                        el("deltaNow").textContent=fmtDelta(dtNow);
-                        el("lastUpdate").textContent=new Date(newestTime).toLocaleString();
+                        if (isStagnant || isOffline) {
+                            const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
+                            fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
+                            
+                            if (isOffline) el("lastUpdate").textContent = new Date(validTime).toLocaleString() + " (Offline or Resetting)";
+                            else el("lastUpdate").textContent = new Date(validTime).toLocaleString() + " (Sensor Frozen)";
+                            
+                        } else {
+                            const core = num(validFeed[Core_Body_Temp]);
+                            const finger = num(validFeed[Fingertip_Temp]);
+                            const amb = num(validFeed[Ambient_Temp]);
+                            const hr = num(validFeed[Heart_Rate]);
+                            const resp = num(validFeed[Respiration_Rate]);
+
+                            el("ambient").textContent=fmtTemp(amb);
+                            el("core").textContent=fmtTemp(core);
+                            el("finger").textContent=fmtTemp(finger);
+                            el("hr").textContent=fmtInt(hr);
+                            el("resp").textContent=fmtInt(resp);
+
+                            const dtNow = (core===null||finger===null) ? null : (core-finger);
+                            el("deltaNow").textContent=fmtDelta(dtNow);
+                            el("lastUpdate").textContent=new Date(validTime).toLocaleString();
+                        }
                     }
 
-                    // Keep rendering the historical chart regardless of current staleness
+                    // Render the historical chart (ignoring zeros!)
                     const dtSeries=feeds.map(r=>{
                         const c=num(r[Core_Body_Temp]);
                         const f=num(r[Fingertip_Temp]);
+                        const a=num(r[Ambient_Temp]);
+                        const h=num(r[Heart_Rate]);
+                        const re=num(r[Respiration_Rate]);
+                        
+                        // Skip rendering this point if it's an all-zero hardware reset
+                        if (c===0 && f===0 && a===0 && h===0 && re===0) return NaN;
+                        
                         return (c===null||f===null)?NaN:(c-f);
                     });
                     drawLineChart(el("dtChart"),dtSeries);
                 }
 
-                // Process Friend/Foe (Untouched by staleness)
+                // Process Friend/Foe (Untouched by staleness or zeros)
                 const ffFeeds = ffData.feeds||[];
                 if(ffFeeds.length){
                     const lastFFEntry = ffFeeds[ffFeeds.length-1];
@@ -340,7 +368,7 @@
                 el("connClass").classList.add("bad");
                 el("connClass").classList.remove("ok");
                 
-                // Set fields to NaN if there is a complete network drop (ignoring friend/foe)
+                // Set fields to NaN if there is a complete network drop
                 const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
                 fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
                 el("lastUpdate").textContent = "Connection Lost";
