@@ -158,9 +158,6 @@
         const RESULTS = 60;
         const POLL_MS = 1000;
         
-        // Timeout variables
-        const STAGNANT_TIMEOUT_MS = 6000000; 
-        
         const el = id => document.getElementById(id);
 
         function num(x){
@@ -236,16 +233,14 @@
                 
                 const data = await res.json();
                 const ffData = await ffRes.json();
-                const now = Date.now();
-
+                
                 // Process Main Biometrics
                 const feeds = data.feeds||[];
                 if(feeds.length){
                     
-                    // 1. Find the newest feed that IS NOT entirely zeros (ignore hardware resets)
+                    // Find the newest feed that IS NOT entirely zeros (ignore hardware resets)
                     let validFeed = null;
-                    let validIndex = -1;
-
+                    
                     for (let i = feeds.length - 1; i >= 0; i--) {
                         const r = feeds[i];
                         const a = num(r[Ambient_Temp]);
@@ -259,68 +254,30 @@
                             continue; 
                         } else {
                             validFeed = r;
-                            validIndex = i;
                             break;
                         }
                     }
 
                     if (!validFeed) {
-                        // Edge case: ALL 60 historical readings were zeros
-                        const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
-                        fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
                         el("lastUpdate").textContent = "Hardware Rebooting...";
                     } else {
+                        // Display the last valid data unconditionally
                         const validTime = new Date(validFeed.created_at).getTime();
-                        
-                        // 2. Look backwards from our valid feed to find how long this specific data has been repeating
-                        let streakStartTime = validTime; 
-                        
-                        for (let i = validIndex; i >= 0; i--) {
-                            const r = feeds[i];
-                            if (
-                                r[Ambient_Temp] === validFeed[Ambient_Temp] &&
-                                r[Core_Body_Temp] === validFeed[Core_Body_Temp] &&
-                                r[Fingertip_Temp] === validFeed[Fingertip_Temp] &&
-                                r[Heart_Rate] === validFeed[Heart_Rate] &&
-                                r[Respiration_Rate] === validFeed[Respiration_Rate]
-                            ) {
-                                streakStartTime = new Date(r.created_at).getTime();
-                            } else {
-                                break; 
-                            }
-                        }
+                        const core = num(validFeed[Core_Body_Temp]);
+                        const finger = num(validFeed[Fingertip_Temp]);
+                        const amb = num(validFeed[Ambient_Temp]);
+                        const hr = num(validFeed[Heart_Rate]);
+                        const resp = num(validFeed[Respiration_Rate]);
 
-                        // 3. Apply the 20-second timeout to the VALID data
-                        const isStagnant = (now - streakStartTime) > STAGNANT_TIMEOUT_MS;
-                        
-                        // Also check if the "last known valid data" is older than 20 seconds.
-                        // (This handles the case where the hardware takes more than 20 seconds to boot up)
-                        const isOffline = (now - validTime) > STAGNANT_TIMEOUT_MS;
+                        el("ambient").textContent=fmtTemp(amb);
+                        el("core").textContent=fmtTemp(core);
+                        el("finger").textContent=fmtTemp(finger);
+                        el("hr").textContent=fmtInt(hr);
+                        el("resp").textContent=fmtInt(resp);
 
-                        if (isStagnant || isOffline) {
-                            const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
-                            fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
-                            
-                            if (isOffline) el("lastUpdate").textContent = new Date(validTime).toLocaleString() + " (Offline or Resetting)";
-                            else el("lastUpdate").textContent = new Date(validTime).toLocaleString() + " (Sensor Frozen)";
-                            
-                        } else {
-                            const core = num(validFeed[Core_Body_Temp]);
-                            const finger = num(validFeed[Fingertip_Temp]);
-                            const amb = num(validFeed[Ambient_Temp]);
-                            const hr = num(validFeed[Heart_Rate]);
-                            const resp = num(validFeed[Respiration_Rate]);
-
-                            el("ambient").textContent=fmtTemp(amb);
-                            el("core").textContent=fmtTemp(core);
-                            el("finger").textContent=fmtTemp(finger);
-                            el("hr").textContent=fmtInt(hr);
-                            el("resp").textContent=fmtInt(resp);
-
-                            const dtNow = (core===null||finger===null) ? null : (core-finger);
-                            el("deltaNow").textContent=fmtDelta(dtNow);
-                            el("lastUpdate").textContent=new Date(validTime).toLocaleString();
-                        }
+                        const dtNow = (core===null||finger===null) ? null : (core-finger);
+                        el("deltaNow").textContent=fmtDelta(dtNow);
+                        el("lastUpdate").textContent=new Date(validTime).toLocaleString();
                     }
 
                     // Render the historical chart (ignoring zeros!)
@@ -367,10 +324,6 @@
                 el("connState").textContent = "Disconnected (Error)";
                 el("connClass").classList.add("bad");
                 el("connClass").classList.remove("ok");
-                
-                // Set fields to NaN if there is a complete network drop
-                const fieldsToNaN = ["ambient", "core", "finger", "hr", "resp", "deltaNow"];
-                fieldsToNaN.forEach(f => { if(el(f)) el(f).textContent = "NaN"; });
                 el("lastUpdate").textContent = "Connection Lost";
             }
         }
